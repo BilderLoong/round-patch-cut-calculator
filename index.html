@@ -1,0 +1,3848 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Round Patch Cut Calculator</title>
+<style>
+  :root {
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color: #171717;
+    background: #f6f6f4;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 24px;
+  }
+
+  .app {
+    width: min(1180px, 100%);
+    margin: 0 auto;
+  }
+
+  h1 {
+    margin: 0 0 6px;
+    font-size: 28px;
+  }
+
+  .subtitle {
+    margin: 0 0 20px;
+    color: #666;
+    line-height: 1.5;
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.45fr) minmax(330px, .55fr);
+    gap: 18px;
+    align-items: start;
+  }
+
+  .card {
+    background: #fff;
+    border: 1px solid #deded8;
+    border-radius: 16px;
+    padding: 16px;
+    box-shadow: 0 4px 18px rgba(0,0,0,.04);
+  }
+
+  .controls {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  label {
+    display: block;
+    font-size: 13px;
+    font-weight: 650;
+    color: #444;
+  }
+
+  input[type="number"] {
+    width: 100%;
+    margin-top: 6px;
+    border: 1px solid #cfcfca;
+    border-radius: 10px;
+    padding: 10px 11px;
+    font: inherit;
+    background: #fff;
+  }
+
+  button {
+    border: 1px solid #cfcfca;
+    background: #fff;
+    border-radius: 10px;
+    padding: 9px 12px;
+    font: inherit;
+    font-weight: 650;
+    cursor: pointer;
+  }
+
+  button:hover { background: #f2f2ef; }
+  button.primary { background: #171717; color: white; border-color: #171717; }
+  button.primary:hover { background: #333; }
+
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 10px 0 12px;
+  }
+
+  .snap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 4px 0 12px;
+    font-size: 13px;
+    color: #555;
+  }
+
+  .measured-cut {
+    margin: 0 0 12px;
+    padding: 12px;
+    border: 1px solid #deded8;
+    border-radius: 12px;
+    background: #fbfbf8;
+  }
+
+  .measured-cut-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 4px;
+  }
+
+  .measured-cut h2 {
+    margin: 0;
+    font-size: 15px;
+  }
+
+  .measured-cut-badge {
+    color: #666;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .measured-cut-help {
+    margin: 0 0 10px;
+    color: #666;
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .measured-cut-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .measured-cut select,
+  .measured-cut input {
+    width: 100%;
+    min-height: 40px;
+    margin-top: 6px;
+    border: 1px solid #cfcfca;
+    border-radius: 9px;
+    padding: 8px 10px;
+    background: #fff;
+    font: inherit;
+  }
+
+  .measured-cut-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+  }
+
+  .measured-cut-status {
+    color: #666;
+    font-size: 12px;
+    line-height: 1.35;
+  }
+
+  .measured-cut-status.valid {
+    color: #176b3a;
+    font-weight: 650;
+  }
+
+  button:disabled,
+  select:disabled,
+  input:disabled {
+    cursor: not-allowed;
+    opacity: .55;
+  }
+
+  .canvas-wrap {
+    position: relative;
+    width: 100%;
+    height: clamp(420px, 68vh, 720px);
+    min-height: 420px;
+    border-radius: 14px;
+    overflow: hidden;
+    background:
+      linear-gradient(#f0f0ec 1px, transparent 1px),
+      linear-gradient(90deg, #f0f0ec 1px, transparent 1px),
+      #fafaf8;
+    background-size: 24px 24px;
+    border: 1px solid #deded8;
+    touch-action: none;
+  }
+
+  .measure-popover {
+    display: none !important;
+    position: absolute;
+    z-index: 5;
+    width: 248px;
+    padding: 10px;
+    border: 1px solid rgba(0,0,0,.10);
+    border-radius: 12px;
+    background: rgba(255,255,255,.96);
+    box-shadow: 0 10px 30px rgba(0,0,0,.12);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    pointer-events: auto;
+    opacity: 0;
+    transform: translate(-50%, calc(-100% - 14px)) scale(.98);
+    transform-origin: bottom center;
+    transition: opacity .12s ease, transform .12s ease;
+    visibility: hidden;
+  }
+
+  .measure-popover.visible {
+    opacity: 1;
+    transform: translate(-50%, calc(-100% - 14px)) scale(1);
+    visibility: visible;
+  }
+
+  .measure-popover::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: -6px;
+    width: 10px;
+    height: 10px;
+    transform: translateX(-50%) rotate(45deg);
+    background: rgba(255,255,255,.96);
+    border-right: 1px solid rgba(0,0,0,.10);
+    border-bottom: 1px solid rgba(0,0,0,.10);
+  }
+
+  .measure-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .measure-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex: 0 0 auto;
+  }
+
+  .measure-title {
+    font-size: 12px;
+    font-weight: 780;
+    color: #222;
+  }
+
+  .measure-edit {
+    display: grid;
+    grid-template-columns: 1fr 82px 28px;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 0;
+    border-top: 1px solid #efefeb;
+    border-bottom: 1px solid #efefeb;
+  }
+
+  .measure-edit label {
+    font-size: 12px;
+    font-weight: 650;
+    color: #555;
+  }
+
+  .measure-edit input {
+    width: 82px;
+    margin: 0;
+    padding: 6px 7px;
+    border-radius: 8px;
+    text-align: right;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .measure-unit {
+    font-size: 11px;
+    color: #777;
+  }
+
+  .measure-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    padding-top: 7px;
+    font-size: 11.5px;
+  }
+
+  .measure-row .k {
+    color: #777;
+  }
+
+  .measure-row .v {
+    color: #222;
+    font-weight: 700;
+  }
+
+  .measure-help {
+    margin-top: 7px;
+    font-size: 10.5px;
+    color: #85857f;
+    line-height: 1.35;
+  }
+
+  canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    cursor: crosshair;
+  }
+
+  .hint {
+    margin-top: 10px;
+    padding: 10px 12px;
+    background: #f4f4ef;
+    border-radius: 10px;
+    color: #555;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .status { font-weight: 760; color: #222; }
+
+  .big {
+    padding: 13px;
+    border-radius: 12px;
+    background: #f4f4ef;
+    margin-bottom: 12px;
+  }
+
+  .big .name {
+    color: #666;
+    font-size: 13px;
+  }
+
+  .big .value {
+    font-size: 30px;
+    font-weight: 820;
+    margin-top: 4px;
+  }
+
+  .section {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid #e7e7e2;
+  }
+
+  .section h2 {
+    font-size: 16px;
+    margin: 0 0 10px;
+  }
+
+  .stats {
+    display: grid;
+  }
+
+  .stat {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 9px 0;
+    border-bottom: 1px solid #ecece8;
+    align-items: baseline;
+  }
+
+  .stat:last-child { border-bottom: 0; }
+  .stat .name { color: #666; font-size: 13px; }
+  .stat .value { font-weight: 730; text-align: right; }
+
+  .template-box {
+    padding: 12px;
+    border: 1px solid #e1e1dc;
+    border-radius: 12px;
+    background: #fbfbf8;
+  }
+
+  .template-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .template-actions .wide { grid-column: 1 / -1; }
+
+  .small-note {
+    margin-top: 8px;
+    color: #6b6b66;
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .warning {
+    margin-top: 14px;
+    border-left: 4px solid #c67b00;
+    padding: 10px 12px;
+    background: #fff8e8;
+    border-radius: 8px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #5f490d;
+  }
+
+  .cut-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto auto;
+    gap: 8px;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid #ecece8;
+    font-size: 13px;
+  }
+
+  .cut-row:last-child { border-bottom: 0; }
+  .cut-row.selected {
+    margin-inline: -6px;
+    padding-inline: 6px;
+    border-radius: 8px;
+    background: #f4f4ef;
+    font-weight: 760;
+  }
+  .cut-row button { padding: 5px 8px; font-size: 12px; }
+
+  .swatch {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+  }
+
+  .muted { color: #777; }
+
+
+  .side-editor {
+    display: grid;
+    gap: 8px;
+  }
+
+  .side-editor-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 106px 34px;
+    gap: 7px;
+    align-items: center;
+    padding: 9px 0;
+    border-bottom: 1px solid #ecece8;
+  }
+
+  .side-editor-row:last-child {
+    border-bottom: 0;
+  }
+
+  .side-editor-row label {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: #666;
+  }
+
+  .side-editor-row input {
+    width: 100%;
+    margin: 0;
+    padding: 7px 8px;
+    border-radius: 8px;
+    text-align: right;
+    font-size: 13px;
+    font-weight: 750;
+  }
+
+  .side-editor-row input:disabled {
+    background: #f4f4f1;
+    color: #999;
+    cursor: not-allowed;
+  }
+
+  .side-unit {
+    color: #777;
+    font-size: 12px;
+  }
+
+  .reference-grid {
+    display: grid;
+  }
+
+  .reference-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid #ecece8;
+    font-size: 13px;
+  }
+
+  .reference-row:last-child {
+    border-bottom: 0;
+  }
+
+  .reference-row .k {
+    color: #777;
+  }
+
+  .reference-row .v {
+    color: #222;
+    font-weight: 700;
+    text-align: right;
+  }
+
+  .undo-tip {
+    margin-top: 12px;
+    padding: 9px 10px;
+    border-radius: 9px;
+    background: #f4f4ef;
+    color: #666;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  @media (max-width: 850px) {
+    body { padding: 12px; }
+    .layout { grid-template-columns: 1fr; }
+    .controls { grid-template-columns: 1fr; }
+    .measured-cut-grid { grid-template-columns: 1fr; }
+    .canvas-wrap {
+      height: clamp(360px, 62vh, 600px);
+      min-height: 360px;
+    }
+  }
+</style>
+</head>
+
+<body>
+<div class="app">
+  <h1>Round Patch Cut Calculator</h1>
+  <p class="subtitle">
+    Draw new cuts anywhere on empty canvas space. Each finished cut owns one colored area and has a handle you can drag at any time.
+  </p>
+
+  <div class="layout">
+    <section class="card">
+      <div class="controls">
+        <label>
+          Patch diameter (cm)
+          <input id="diameter" type="number" min="0.1" step="0.01" value="6.18039">
+        </label>
+
+        <label>
+          Patch total area (cm²)
+          <input id="patchArea" type="number" min="0.01" step="0.01" value="30">
+        </label>
+
+        <label>
+          Full-patch labeled dosage (mg)
+          <input id="fullDose" type="number" min="0.001" step="0.1" value="21">
+        </label>
+      </div>
+
+      <div class="toolbar">
+        <button id="fitBtn" class="primary">Fit patch</button>
+        <button id="undoBtn">Undo</button>
+        <button id="resetBtn">Reset</button>
+      </div>
+
+      <label class="snap">
+        <input id="snapToggle" type="checkbox" checked>
+        Magnetic horizontal / vertical snapping
+      </label>
+
+      <div class="measured-cut">
+        <div class="measured-cut-head">
+          <h2>Measured endpoint cut</h2>
+          <span class="measured-cut-badge">Angle calculated automatically</span>
+        </div>
+        <p class="measured-cut-help">
+          For Cut 1, enter either its horizontal chord length or the dosage for its top area. Later cuts start from End A or End B of the previous cut, and the calculator calculates their angle.
+        </p>
+
+        <div class="measured-cut-grid">
+          <label>
+            Cut start
+            <select id="linkedStart">
+              <option value="first">First cut (horizontal)</option>
+              <option value="a">End A</option>
+              <option value="b">End B</option>
+            </select>
+          </label>
+
+          <label>
+            New cut length (cm)
+            <input id="linkedLength" type="number" min="0.001" step="0.001" placeholder="Example: 3.000">
+          </label>
+
+          <label>
+            New area dosage (mg)
+            <input id="linkedDose" type="number" min="0.001" step="0.001" placeholder="Example: 1.500">
+          </label>
+
+          <label>
+            Direction around circle
+            <select id="linkedDirection">
+              <option value="auto">Auto (recommended)</option>
+              <option value="clockwise">Clockwise</option>
+              <option value="counterclockwise">Counterclockwise</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="measured-cut-actions">
+          <button id="linkedAddBtn" class="primary" disabled>Add measured cut</button>
+          <button id="linkedRoundBtn" disabled>Round length to 0.1 cm</button>
+          <span id="linkedStatus" class="measured-cut-status">Enter the first cut length or dosage.</span>
+        </div>
+      </div>
+
+      <div class="canvas-wrap" id="canvasWrap">
+        <canvas id="canvas"></canvas>
+
+        <div class="measure-popover" id="measurePopover">
+          <div class="measure-head">
+            <span class="measure-dot" id="measureDot"></span>
+            <span class="measure-title" id="measureTitle">Cut</span>
+          </div>
+
+          <div class="measure-edit">
+            <label for="hoverCurrentDose">Selected area dosage</label>
+            <input id="hoverCurrentDose" type="number" min="0" step="0.001">
+            <span class="measure-unit">mg</span>
+          </div>
+
+          <div class="measure-edit">
+            <label for="hoverCurrentArea">Selected area</label>
+            <input id="hoverCurrentArea" type="number" min="0" step="0.01">
+            <span class="measure-unit">cm²</span>
+          </div>
+
+          <div class="measure-edit">
+            <label for="hoverCutLength">Cut length</label>
+            <input id="hoverCutLength" type="number" min="0" step="0.01">
+            <span class="measure-unit">cm</span>
+          </div>
+
+          <div class="measure-help">
+            Edit any value and press Enter. The cut slides without changing its angle, and the other two values update automatically.
+          </div>
+        </div>
+      </div>
+
+      <div class="hint">
+        <span class="status" id="status">Ready:</span>
+        <span id="instruction">
+          click empty space twice to draw a cut. Drag a colored handle to move its cut. Hold Space or Shift and drag to pan; use the wheel/trackpad to zoom.
+        </span>
+      </div>
+    </section>
+
+    <aside class="card">
+      <div class="big">
+        <div class="name" id="currentDoseName">Uncut remaining dosage</div>
+        <div class="value" id="currentDose">21.000 mg</div>
+      </div>
+
+      <div class="section" style="margin-top:0;padding-top:0;border-top:0">
+        <h2>Selected cut area</h2>
+
+        <div class="side-editor">
+          <div class="side-editor-row">
+            <label for="sideCurrentDose">Area dosage</label>
+            <input id="sideCurrentDose" type="number" min="0" step="0.001">
+            <span class="side-unit">mg</span>
+          </div>
+
+          <div class="side-editor-row">
+            <label for="sideCurrentArea">Area size</label>
+            <input id="sideCurrentArea" type="number" min="0" step="0.0001">
+            <span class="side-unit">cm²</span>
+          </div>
+
+          <div class="side-editor-row">
+            <label for="sideCutLength">Selected cut length</label>
+            <input id="sideCutLength" type="number" min="0" step="0.001">
+            <span class="side-unit">cm</span>
+          </div>
+        </div>
+
+        <div class="small-note">
+          Select a colored area, edit any one value, then press Enter. Its cut slides without changing its angle, and the other linked measurements update automatically.
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>Selected cut reference</h2>
+
+        <div class="reference-grid">
+          <div class="reference-row">
+            <span class="k">Full-circle chord length</span>
+            <span class="v" id="refChordLength">—</span>
+          </div>
+          <div class="reference-row">
+            <span class="k">Offset from circle center</span>
+            <span class="v" id="refCenterOffset">—</span>
+          </div>
+          <div class="reference-row">
+            <span class="k">Kept-side rim depth</span>
+            <span class="v" id="refKeptRim">—</span>
+          </div>
+          <div class="reference-row">
+            <span class="k">Removed-side rim depth</span>
+            <span class="v" id="refRemovedRim">—</span>
+          </div>
+          <div class="reference-row">
+            <span class="k">Previous cut spacing</span>
+            <span class="v" id="refPreviousSpacing">—</span>
+          </div>
+          <div class="reference-row">
+            <span class="k">Angle vs previous cut</span>
+            <span class="v" id="refPreviousAngle">—</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>Patch</h2>
+        <div class="reference-row">
+          <span class="k">Patch total area</span>
+          <span class="v" id="sidebarPatchArea">—</span>
+        </div>
+        <div class="reference-row">
+          <span class="k">Uncut remaining area</span>
+          <span class="v" id="sidebarRemainingArea">—</span>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>Cut areas</h2>
+        <div id="cutList" class="muted">No cuts yet.</div>
+      </div>
+
+      <div class="undo-tip">
+        Right-click anywhere inside this calculator to undo the most recent edit.
+      </div>
+
+      <div class="warning">
+        Nicotine note: this page performs geometry and an area-proportional dosage calculation only. It does not determine a medically appropriate nicotine dose, and some nicotine patches are labeled not to be cut.
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+
+  const canvas = $('canvas');
+  const wrap = $('canvasWrap');
+  const ctx = canvas.getContext('2d');
+
+  const diameterInput = $('diameter');
+  const patchAreaInput = $('patchArea');
+  const fullDoseInput = $('fullDose');
+  const snapToggle = $('snapToggle');
+  const linkedStartInput = $('linkedStart');
+  const linkedLengthInput = $('linkedLength');
+  const linkedDoseInput = $('linkedDose');
+  const linkedDirectionInput = $('linkedDirection');
+  const linkedAddBtn = $('linkedAddBtn');
+  const linkedRoundBtn = $('linkedRoundBtn');
+  const linkedStatusEl = $('linkedStatus');
+
+  const currentDoseEl = $('currentDose');
+  const currentDoseNameEl = $('currentDoseName');
+  const sidebarPatchAreaEl = $('sidebarPatchArea');
+  const sidebarRemainingAreaEl = $('sidebarRemainingArea');
+
+  const sideCurrentDoseInput = $('sideCurrentDose');
+  const sideCurrentAreaInput = $('sideCurrentArea');
+  const sideCutLengthInput = $('sideCutLength');
+
+  const refChordLengthEl = $('refChordLength');
+  const refCenterOffsetEl = $('refCenterOffset');
+  const refKeptRimEl = $('refKeptRim');
+  const refRemovedRimEl = $('refRemovedRim');
+  const refPreviousSpacingEl = $('refPreviousSpacing');
+  const refPreviousAngleEl = $('refPreviousAngle');
+
+  const cutList = $('cutList');
+  const statusEl = $('status');
+  const instructionEl = $('instruction');
+
+  const measurePopover = $('measurePopover');
+  const measureDot = $('measureDot');
+  const measureTitle = $('measureTitle');
+  const hoverCurrentDoseInput = $('hoverCurrentDose');
+  const hoverCurrentAreaInput = $('hoverCurrentArea');
+  const hoverCutLengthInput = $('hoverCutLength');
+
+  const COLORS = [
+    '#e74c3c',
+    '#3498db',
+    '#27ae60',
+    '#9b59b6',
+    '#f39c12',
+    '#16a085',
+    '#d35400',
+    '#2c3e50'
+  ];
+
+  const CIRCLE_SEGMENTS = 2048;
+  const SNAP_DEGREES = 8;
+  const HANDLE_RADIUS_PX = 11;
+  // Intentionally much larger than the visible handle so its entire edge is easy to grab.
+  const HANDLE_HIT_PX = 30;
+  const LINE_HIT_PX = 10;
+  const PARALLEL_TOLERANCE_DEG = 1.0;
+
+  let cuts = [];
+  let nextColor = 0;
+
+  // One interaction mode. State only describes whether a new cut is being drawn.
+  let drawStage = 'idle'; // idle | secondPoint | chooseSide
+  let firstPoint = null;
+  let previewPoint = null;
+  let pendingLine = null;
+
+  let selectedCut = -1;
+  let hoveredHandle = -1;
+  let hoveredLine = -1;
+  let hoveredArea = -1;
+
+  let draggingHandle = false;
+  let dragStart = null;
+  let dragOriginal = null;
+
+  let popoverCut = -1;
+  let popoverPinned = false;
+  let popoverHideTimer = null;
+
+  let viewZoom = 1;
+  let viewPanX = 0;
+  let viewPanY = 0;
+  let isPanning = false;
+  let panStartCanvas = null;
+  let panStartX = 0;
+  let panStartY = 0;
+  let spaceHeld = false;
+  let syncingPatchSize = false;
+  let sidebarMeasurementCut = -1;
+  let linkedMeasurementSource = 'length';
+
+  const history = [];
+  const HISTORY_LIMIT = 100;
+  let dragUndoSnapshot = null;
+  let dragHistoryRecorded = false;
+  let fieldUndoSnapshot = null;
+  let fieldHistoryRecorded = false;
+  let restoringHistory = false;
+
+  function cloneCuts(source = cuts) {
+    return source.map(cut => ({
+      a: { ...cut.a },
+      b: { ...cut.b },
+      removeSign: cut.removeSign,
+      color: cut.color
+    }));
+  }
+
+  function snapshotState() {
+    return {
+      cuts: cloneCuts(),
+      nextColor,
+      selectedCut,
+      diameterValue: diameterInput.value,
+      patchAreaValue: patchAreaInput.value,
+      fullDoseValue: fullDoseInput.value,
+      snapChecked: snapToggle.checked,
+      viewZoom,
+      viewPanX,
+      viewPanY
+    };
+  }
+
+  function pushSnapshot(snapshot = snapshotState()) {
+    if (restoringHistory) return;
+
+    history.push(snapshot);
+
+    if (history.length > HISTORY_LIMIT) {
+      history.shift();
+    }
+  }
+
+  function restoreSnapshot(snapshot) {
+    if (!snapshot) return;
+
+    restoringHistory = true;
+
+    cuts = cloneCuts(snapshot.cuts || []);
+    nextColor = snapshot.nextColor ?? cuts.length;
+    selectedCut = Math.min(
+      snapshot.selectedCut ?? -1,
+      cuts.length - 1
+    );
+
+    diameterInput.value = snapshot.diameterValue;
+    patchAreaInput.value = snapshot.patchAreaValue;
+    fullDoseInput.value = snapshot.fullDoseValue;
+    snapToggle.checked = snapshot.snapChecked;
+
+    viewZoom = snapshot.viewZoom ?? 1;
+    viewPanX = snapshot.viewPanX ?? 0;
+    viewPanY = snapshot.viewPanY ?? 0;
+
+    drawStage = 'idle';
+    firstPoint = null;
+    pendingLine = null;
+    previewPoint = null;
+    draggingHandle = false;
+    dragUndoSnapshot = null;
+    dragHistoryRecorded = false;
+    fieldUndoSnapshot = null;
+    fieldHistoryRecorded = false;
+
+    restoringHistory = false;
+
+    statusEl.textContent = 'Undone:';
+    instructionEl.textContent =
+      ' restored the previous edit state.';
+
+    draw();
+  }
+
+  function undoLastOperation() {
+    if (drawStage !== 'idle') {
+      drawStage = 'idle';
+      firstPoint = null;
+      pendingLine = null;
+      previewPoint = null;
+
+      statusEl.textContent = 'Cancelled:';
+      instructionEl.textContent =
+        ' the unfinished cut was cancelled.';
+      draw();
+      return;
+    }
+
+    if (!history.length) {
+      statusEl.textContent = 'Nothing to undo:';
+      instructionEl.textContent =
+        ' there is no earlier edit in the history.';
+      return;
+    }
+
+    restoreSnapshot(history.pop());
+  }
+
+  function beginFieldHistory() {
+    if (restoringHistory) return;
+    fieldUndoSnapshot = snapshotState();
+    fieldHistoryRecorded = false;
+  }
+
+  function recordFieldHistoryOnce() {
+    if (
+      restoringHistory ||
+      fieldHistoryRecorded ||
+      !fieldUndoSnapshot
+    ) {
+      return;
+    }
+
+    pushSnapshot(fieldUndoSnapshot);
+    fieldHistoryRecorded = true;
+  }
+
+  function endFieldHistory() {
+    fieldUndoSnapshot = null;
+    fieldHistoryRecorded = false;
+  }
+
+  function diameter() {
+    const n = Number(diameterInput.value);
+    return Number.isFinite(n) && n > 0 ? n : 1;
+  }
+
+  function radius() {
+    return diameter() / 2;
+  }
+
+  function fullDose() {
+    const n = Number(fullDoseInput.value);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  }
+
+  function originalArea() {
+    const r = radius();
+    return Math.PI * r * r;
+  }
+
+  function syncPatchAreaFromDiameter() {
+    if (syncingPatchSize) return;
+    syncingPatchSize = true;
+    patchAreaInput.value = originalArea().toFixed(4);
+    syncingPatchSize = false;
+  }
+
+  function syncDiameterFromPatchArea() {
+    if (syncingPatchSize) return;
+
+    const area = Number(patchAreaInput.value);
+    if (!Number.isFinite(area) || area <= 0) return;
+
+    syncingPatchSize = true;
+    const d = 2 * Math.sqrt(area / Math.PI);
+    diameterInput.value = d.toFixed(4);
+    syncingPatchSize = false;
+  }
+
+  function circlePolygon() {
+    const r = radius();
+    const out = [];
+
+    for (let i = 0; i < CIRCLE_SEGMENTS; i++) {
+      const a = i / CIRCLE_SEGMENTS * Math.PI * 2;
+      out.push({
+        x: Math.cos(a) * r,
+        y: Math.sin(a) * r
+      });
+    }
+
+    return out;
+  }
+
+  function cross(a, b, p) {
+    return (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
+  }
+
+  function insideHalfPlane(point, cut) {
+    return cross(cut.a, cut.b, point) * cut.removeSign <= 1e-9;
+  }
+
+  function segmentLineIntersection(s, e, cut) {
+    const cs = cross(cut.a, cut.b, s);
+    const ce = cross(cut.a, cut.b, e);
+    const denom = cs - ce;
+
+    if (Math.abs(denom) < 1e-12) return { ...s };
+
+    const t = cs / denom;
+
+    return {
+      x: s.x + (e.x - s.x) * t,
+      y: s.y + (e.y - s.y) * t
+    };
+  }
+
+  function clipPolygon(poly, cut) {
+    if (!poly.length) return [];
+
+    const out = [];
+
+    for (let i = 0; i < poly.length; i++) {
+      const s = poly[i];
+      const e = poly[(i + 1) % poly.length];
+
+      const sIn = insideHalfPlane(s, cut);
+      const eIn = insideHalfPlane(e, cut);
+
+      if (sIn && eIn) {
+        out.push(e);
+      } else if (sIn && !eIn) {
+        out.push(segmentLineIntersection(s, e, cut));
+      } else if (!sIn && eIn) {
+        out.push(segmentLineIntersection(s, e, cut));
+        out.push(e);
+      }
+    }
+
+    return out;
+  }
+
+  function remainingPolygonForCuts(sourceCuts, count = sourceCuts.length) {
+    let poly = circlePolygon();
+
+    for (let i = 0; i < count; i++) {
+      poly = clipPolygon(poly, sourceCuts[i]);
+      if (!poly.length) break;
+    }
+
+    return poly;
+  }
+
+  function remainingPolygon(count = cuts.length) {
+    return remainingPolygonForCuts(cuts, count);
+  }
+
+  function cutAreaPolygonForCuts(sourceCuts, index) {
+    if (index < 0 || index >= sourceCuts.length) return [];
+
+    const cut = sourceCuts[index];
+    const pieceBeforeCut = remainingPolygonForCuts(sourceCuts, index);
+
+    return clipPolygon(pieceBeforeCut, {
+      ...cut,
+      removeSign: -cut.removeSign
+    });
+  }
+
+  function cutAreaForCuts(sourceCuts, index) {
+    return polygonArea(cutAreaPolygonForCuts(sourceCuts, index));
+  }
+
+  function cutArea(index) {
+    return cutAreaForCuts(cuts, index);
+  }
+
+  function cutDose(index) {
+    const full = originalArea();
+    if (full <= 0) return 0;
+    return fullDose() * cutArea(index) / full;
+  }
+
+  function polygonArea(poly) {
+    if (poly.length < 3) return 0;
+
+    let sum = 0;
+
+    for (let i = 0; i < poly.length; i++) {
+      const a = poly[i];
+      const b = poly[(i + 1) % poly.length];
+      sum += a.x * b.y - b.x * a.y;
+    }
+
+    return Math.abs(sum) / 2;
+  }
+
+  function currentFraction() {
+    const full = originalArea();
+    if (full <= 0) return 0;
+
+    return Math.max(
+      0,
+      Math.min(1, polygonArea(remainingPolygon()) / full)
+    );
+  }
+
+  function currentDose() {
+    return fullDose() * currentFraction();
+  }
+
+  function pointInPolygon(point, poly) {
+    let inside = false;
+
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const a = poly[i];
+      const b = poly[j];
+      const crossesRay =
+        (a.y > point.y) !== (b.y > point.y) &&
+        point.x <
+          (b.x - a.x) * (point.y - a.y) /
+          (b.y - a.y) + a.x;
+
+      if (crossesRay) inside = !inside;
+    }
+
+    return inside;
+  }
+
+  function findAreaPhysical(point) {
+    for (let i = cuts.length - 1; i >= 0; i--) {
+      if (pointInPolygon(point, cutAreaPolygonForCuts(cuts, i))) {
+        return i;
+      }
+    }
+
+    return -1;
+  }
+
+  function view() {
+    const rect = canvas.getBoundingClientRect();
+    const size = Math.min(rect.width, rect.height);
+    const pad = Math.max(30, size * .075);
+    const baseRPx = (size - pad * 2) / 2;
+    const baseScale = baseRPx / radius();
+
+    return {
+      width: rect.width,
+      height: rect.height,
+      cx: rect.width / 2 + viewPanX,
+      cy: rect.height / 2 + viewPanY,
+      rPx: baseRPx * viewZoom,
+      scale: baseScale * viewZoom,
+      baseScale
+    };
+  }
+
+  function fitPatch() {
+    viewZoom = 1;
+    viewPanX = 0;
+    viewPanY = 0;
+    draw();
+  }
+
+  function toPhysical(px, py) {
+    const v = view();
+
+    return {
+      x: (px - v.cx) / v.scale,
+      y: (py - v.cy) / v.scale
+    };
+  }
+
+  function toCanvas(point) {
+    const v = view();
+
+    return {
+      x: v.cx + point.x * v.scale,
+      y: v.cy + point.y * v.scale
+    };
+  }
+
+  function pointerCanvas(evt) {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: evt.clientX - rect.left,
+      y: evt.clientY - rect.top
+    };
+  }
+
+  function pointerPhysical(evt) {
+    const p = pointerCanvas(evt);
+    return toPhysical(p.x, p.y);
+  }
+
+  function snapSecondPoint(a, b) {
+    if (!snapToggle.checked) return b;
+
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+
+    if (Math.abs(dx) < 1e-12 && Math.abs(dy) < 1e-12) return b;
+
+    const deg = Math.abs(Math.atan2(dy, dx) * 180 / Math.PI);
+
+    const horizontalDistance = Math.min(
+      deg,
+      Math.abs(180 - deg)
+    );
+
+    const verticalDistance = Math.abs(90 - deg);
+
+    if (horizontalDistance <= SNAP_DEGREES) {
+      return { x: b.x, y: a.y };
+    }
+
+    if (verticalDistance <= SNAP_DEGREES) {
+      return { x: a.x, y: b.y };
+    }
+
+    return b;
+  }
+
+  function linePolygonIntersections(a, b, poly) {
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+
+    if (dx * dx + dy * dy < 1e-12) return [];
+
+    const hits = [];
+
+    function addHit(p) {
+      for (const q of hits) {
+        if (Math.hypot(p.x - q.x, p.y - q.y) < 1e-7) return;
+      }
+      hits.push(p);
+    }
+
+    for (let i = 0; i < poly.length; i++) {
+      const p = poly[i];
+      const q = poly[(i + 1) % poly.length];
+
+      const ex = q.x - p.x;
+      const ey = q.y - p.y;
+
+      const denom = dx * ey - dy * ex;
+
+      if (Math.abs(denom) < 1e-12) continue;
+
+      const pax = p.x - a.x;
+      const pay = p.y - a.y;
+
+      const t = (pax * ey - pay * ex) / denom;
+      const u = (pax * dy - pay * dx) / denom;
+
+      if (u >= -1e-9 && u <= 1 + 1e-9) {
+        addHit({
+          x: a.x + t * dx,
+          y: a.y + t * dy,
+          t
+        });
+      }
+    }
+
+    hits.sort((p, q) => p.t - q.t);
+
+    return hits;
+  }
+
+  function lineCircleIntersections(a, b) {
+    return linePolygonIntersections(a, b, circlePolygon());
+  }
+
+  function cutSegmentThroughPiece(index) {
+    if (index < 0 || index >= cuts.length) return null;
+
+    const cut = cuts[index];
+    const before = remainingPolygon(index);
+    const hits = linePolygonIntersections(cut.a, cut.b, before);
+
+    if (hits.length < 2) return null;
+
+    return {
+      a: hits[0],
+      b: hits[hits.length - 1]
+    };
+  }
+
+  function cutSegmentThroughCircle(index) {
+    if (index < 0 || index >= cuts.length) return null;
+
+    const cut = cuts[index];
+    const hits = lineCircleIntersections(cut.a, cut.b);
+
+    if (hits.length < 2) return null;
+
+    return {
+      a: hits[0],
+      b: hits[hits.length - 1]
+    };
+  }
+
+  function buildFirstMeasuredCutCandidate({
+    length,
+    circleRadius,
+    currentPiece
+  }) {
+    if (!Number.isFinite(length) || length <= 0) {
+      return {
+        ok: false,
+        message: 'Enter the first cut length.'
+      };
+    }
+
+    const diameterValue = circleRadius * 2;
+
+    if (length > diameterValue) {
+      return {
+        ok: false,
+        message: `The maximum chord length is ${diameterValue.toFixed(3)} cm.`
+      };
+    }
+
+    const halfLength = length / 2;
+    const offset = Math.sqrt(Math.max(
+      0,
+      circleRadius * circleRadius - halfLength * halfLength
+    ));
+    const cut = {
+      a: { x: -halfLength, y: -offset },
+      b: { x: halfLength, y: -offset },
+      removeSign: -1
+    };
+    const removedPolygon = clipPolygon(currentPiece, {
+      ...cut,
+      removeSign: 1
+    });
+    const removedArea = polygonArea(removedPolygon);
+    const circleArea = Math.PI * circleRadius * circleRadius;
+
+    if (removedArea <= circleArea * 1e-7) {
+      return {
+        ok: false,
+        message: 'This first cut is too small to create a measurable area.'
+      };
+    }
+
+    return {
+      ok: true,
+      cut,
+      direction: 'horizontal',
+      length,
+      lineAngle: 0,
+      removedArea,
+      message:
+        `First-cut preview: ${length.toFixed(3)} cm horizontal cut, ` +
+        `${removedArea.toFixed(3)} cm² top area.`
+    };
+  }
+
+  function solveFirstMeasuredCutForArea(options, targetArea) {
+    const circleArea = Math.PI * options.circleRadius * options.circleRadius;
+
+    if (!Number.isFinite(targetArea) || targetArea <= 0) {
+      return {
+        ok: false,
+        message: 'Enter the dosage for the first area.'
+      };
+    }
+
+    if (targetArea > circleArea / 2 + 1e-9) {
+      return {
+        ok: false,
+        message: 'The first top area cannot be larger than half of the patch.'
+      };
+    }
+
+    const bounds = Array.from({ length: 60 }).reduce(
+      ({ lowerLength, upperLength }) => {
+        const length = (lowerLength + upperLength) / 2;
+        const candidate = buildFirstMeasuredCutCandidate({
+          ...options,
+          length
+        });
+
+        if (!candidate.ok || candidate.removedArea < targetArea) {
+          return { lowerLength: length, upperLength };
+        }
+
+        return { lowerLength, upperLength: length };
+      },
+      {
+        lowerLength: 0,
+        upperLength: options.circleRadius * 2
+      }
+    );
+
+    return buildFirstMeasuredCutCandidate({
+      ...options,
+      length: (bounds.lowerLength + bounds.upperLength) / 2
+    });
+  }
+
+  function buildMeasuredCutCandidate({
+    previousSegment,
+    previousCuts,
+    currentPiece,
+    startChoice,
+    length,
+    direction,
+    circleRadius
+  }) {
+    if (!Number.isFinite(length) || length <= 0) {
+      return {
+        ok: false,
+        message: 'Enter the new cut length.'
+      };
+    }
+
+    const diameterValue = circleRadius * 2;
+
+    if (length > diameterValue) {
+      return {
+        ok: false,
+        message: `The maximum chord length is ${diameterValue.toFixed(3)} cm.`
+      };
+    }
+
+    const start =
+      startChoice === 'a'
+        ? previousSegment.a
+        : previousSegment.b;
+    const previousOtherEnd =
+      startChoice === 'a'
+        ? previousSegment.b
+        : previousSegment.a;
+    const startAngle = Math.atan2(start.y, start.x);
+    const centralAngle = 2 * Math.asin(
+      Math.min(1, length / diameterValue)
+    );
+    const directionSign = direction === 'clockwise' ? 1 : -1;
+    const endAngle = startAngle + directionSign * centralAngle;
+    const end = {
+      x: Math.cos(endAngle) * circleRadius,
+      y: Math.sin(endAngle) * circleRadius
+    };
+    const side = cross(start, end, previousOtherEnd);
+
+    if (Math.abs(side) < 1e-9) {
+      return {
+        ok: false,
+        message: 'This cut overlaps the previous cut. Change the length or direction.'
+      };
+    }
+
+    if (
+      !previousCuts.every(cut => insideHalfPlane(start, cut)) ||
+      !previousCuts.every(cut => insideHalfPlane(end, cut))
+    ) {
+      return {
+        ok: false,
+        message: 'This direction does not end on the remaining piece. Try the other direction or endpoint.'
+      };
+    }
+
+    const cut = {
+      a: { ...start },
+      b: end,
+      removeSign: side > 0 ? 1 : -1
+    };
+    const removedPolygon = clipPolygon(currentPiece, {
+      ...cut,
+      removeSign: -cut.removeSign
+    });
+    const removedArea = polygonArea(removedPolygon);
+
+    const circleArea = Math.PI * circleRadius * circleRadius;
+
+    if (removedArea <= circleArea * 1e-7) {
+      return {
+        ok: false,
+        message: 'This cut does not create a new area. Change the length, endpoint, or direction.'
+      };
+    }
+
+    const lineAngle = Math.atan2(
+      end.y - start.y,
+      end.x - start.x
+    ) * 180 / Math.PI;
+
+    return {
+      ok: true,
+      cut,
+      direction,
+      length,
+      lineAngle,
+      removedArea,
+      message:
+        `Preview: ${length.toFixed(3)} cm cut, ${removedArea.toFixed(3)} cm² area. ` +
+        `Calculated line angle ${lineAngle.toFixed(1)}°.`
+    };
+  }
+
+  function bisectMeasuredCutArea(options, targetArea, lower, upper) {
+    let lo = lower;
+    let hi = upper;
+    let loCandidate = buildMeasuredCutCandidate({
+      ...options,
+      length: lo
+    });
+
+    if (!loCandidate.ok) return null;
+
+    for (let i = 0; i < 60; i++) {
+      const mid = (lo + hi) / 2;
+      const midCandidate = buildMeasuredCutCandidate({
+        ...options,
+        length: mid
+      });
+
+      if (!midCandidate.ok) return null;
+
+      const loDifference = loCandidate.removedArea - targetArea;
+      const midDifference = midCandidate.removedArea - targetArea;
+
+      if (Math.abs(midDifference) < 1e-9) return midCandidate;
+
+      if (loDifference * midDifference <= 0) {
+        hi = mid;
+      } else {
+        lo = mid;
+        loCandidate = midCandidate;
+      }
+    }
+
+    return buildMeasuredCutCandidate({
+      ...options,
+      length: (lo + hi) / 2
+    });
+  }
+
+  function solveMeasuredCutForArea(options, targetArea, preferredLength) {
+    const diameterValue = options.circleRadius * 2;
+    const sampleCount = 720;
+    const samples = Array.from(
+      { length: sampleCount },
+      (_, index) => {
+        const length = diameterValue * (index + 1) / sampleCount;
+        return {
+          index,
+          length,
+          candidate: buildMeasuredCutCandidate({
+            ...options,
+            length
+          })
+        };
+      }
+    );
+    const validSamples = samples.filter(sample => sample.candidate.ok);
+
+    if (!validSamples.length) {
+      return {
+        ok: false,
+        message: 'No connected cut is available for this endpoint and direction.'
+      };
+    }
+
+    const bestSample = validSamples.reduce((best, sample) => {
+      const error = Math.abs(sample.candidate.removedArea - targetArea);
+      return error < best.error ? { sample, error } : best;
+    }, {
+      sample: validSamples[0],
+      error: Math.abs(validSamples[0].candidate.removedArea - targetArea)
+    });
+
+    const roots = samples.slice(1).map((sample, index) => {
+      const previous = samples[index];
+
+      if (!previous.candidate.ok || !sample.candidate.ok) return null;
+
+      const previousDifference =
+        previous.candidate.removedArea - targetArea;
+      const difference = sample.candidate.removedArea - targetArea;
+
+      if (previousDifference * difference > 0) return null;
+
+      return bisectMeasuredCutArea(
+        options,
+        targetArea,
+        previous.length,
+        sample.length
+      );
+    }).filter(candidate => candidate?.ok);
+
+    if (roots.length) {
+      if (!Number.isFinite(preferredLength)) return roots[0];
+
+      return roots.reduce((closest, candidate) =>
+        Math.abs(candidate.length - preferredLength) <
+        Math.abs(closest.length - preferredLength)
+          ? candidate
+          : closest
+      );
+    }
+
+    const tolerance = Math.max(1e-5, targetArea * 0.00001);
+
+    if (bestSample.error <= tolerance) {
+      return bestSample.sample.candidate;
+    }
+
+    return {
+      ok: false,
+      message: 'This dosage is not reachable from the selected endpoint and direction.'
+    };
+  }
+
+  function firstMeasuredCutPreview() {
+    const baseOptions = {
+      circleRadius: radius(),
+      currentPiece: circlePolygon()
+    };
+
+    if (linkedMeasurementSource === 'dose') {
+      const dose = Number(linkedDoseInput.value);
+      const full = fullDose();
+
+      if (!Number.isFinite(dose) || dose <= 0) {
+        return {
+          ok: false,
+          message: 'Enter the dosage for the first top area.'
+        };
+      }
+
+      if (!(full > 0) || dose > full / 2) {
+        return {
+          ok: false,
+          message: `The first top-area dosage cannot exceed ${(full / 2).toFixed(3)} mg.`
+        };
+      }
+
+      const targetArea = originalArea() * dose / full;
+      const solved = solveFirstMeasuredCutForArea(
+        baseOptions,
+        targetArea
+      );
+
+      if (!solved.ok) return solved;
+
+      return {
+        ...solved,
+        dosage: dose,
+        message:
+          `First-cut preview: ${solved.length.toFixed(3)} cm horizontal cut, ` +
+          `${solved.removedArea.toFixed(3)} cm² top area, ${dose.toFixed(3)} mg.`
+      };
+    }
+
+    const candidate = buildFirstMeasuredCutCandidate({
+      ...baseOptions,
+      length: Number(linkedLengthInput.value)
+    });
+
+    if (!candidate.ok) return candidate;
+
+    const dosage = fullDose() * candidate.removedArea / originalArea();
+
+    return {
+      ...candidate,
+      dosage,
+      message:
+        `First-cut preview: ${candidate.length.toFixed(3)} cm horizontal cut, ` +
+        `${candidate.removedArea.toFixed(3)} cm² top area, ${dosage.toFixed(3)} mg.`
+    };
+  }
+
+  function measuredCutPreview() {
+    if (!cuts.length) {
+      return firstMeasuredCutPreview();
+    }
+
+    const previousSegment = cutSegmentThroughCircle(cuts.length - 1);
+
+    if (!previousSegment) {
+      return {
+        ok: false,
+        message: 'The previous cut has no usable circle endpoints.'
+      };
+    }
+
+    const baseOptions = {
+      previousSegment,
+      previousCuts: cuts,
+      currentPiece: remainingPolygon(),
+      startChoice: linkedStartInput.value,
+      circleRadius: radius()
+    };
+    const directionSetting = linkedDirectionInput.value;
+    const directions = directionSetting === 'auto'
+      ? ['clockwise', 'counterclockwise']
+      : [directionSetting];
+    const autoDirectionMessage = direction =>
+      directionSetting === 'auto'
+        ? ` Auto chose ${direction}.`
+        : '';
+
+    if (linkedMeasurementSource === 'dose') {
+      const dose = Number(linkedDoseInput.value);
+      const full = fullDose();
+
+      if (!Number.isFinite(dose) || dose <= 0) {
+        return {
+          ok: false,
+          message: 'Enter the dosage for the new area.'
+        };
+      }
+
+      if (!(full > 0) || dose > full) {
+        return {
+          ok: false,
+          message: `Enter a dosage no greater than ${full.toFixed(3)} mg.`
+        };
+      }
+
+      const targetArea = originalArea() * dose / full;
+      const preferredLength = Number(linkedLengthInput.value);
+      const solutions = directions.map(direction =>
+        solveMeasuredCutForArea(
+          { ...baseOptions, direction },
+          targetArea,
+          preferredLength
+        )
+      );
+      const validSolutions = solutions.filter(solution => solution.ok);
+
+      if (!validSolutions.length) {
+        if (directionSetting !== 'auto') return solutions[0];
+
+        return {
+          ok: false,
+          message: 'This dosage is not reachable from this endpoint in either direction.'
+        };
+      }
+
+      const solved = directionSetting === 'auto'
+        ? validSolutions.reduce((shortest, solution) =>
+            solution.length < shortest.length ? solution : shortest
+          )
+        : validSolutions[0];
+
+      return {
+        ...solved,
+        dosage: dose,
+        message:
+          `Preview: ${solved.length.toFixed(3)} cm cut, ` +
+          `${solved.removedArea.toFixed(3)} cm² area, ${dose.toFixed(3)} mg.` +
+          autoDirectionMessage(solved.direction)
+      };
+    }
+
+    const length = Number(linkedLengthInput.value);
+    const candidates = directions.map(direction =>
+      buildMeasuredCutCandidate({
+        ...baseOptions,
+        direction,
+        length
+      })
+    );
+    const validCandidates = candidates.filter(candidate => candidate.ok);
+
+    if (!validCandidates.length) {
+      if (directionSetting !== 'auto') return candidates[0];
+
+      return {
+        ok: false,
+        message: 'This cut length does not reach the remaining piece in either direction.'
+      };
+    }
+
+    const candidate = directionSetting === 'auto'
+      ? validCandidates.reduce((smallestArea, option) =>
+          option.removedArea < smallestArea.removedArea
+            ? option
+            : smallestArea
+        )
+      : validCandidates[0];
+
+    const dosage = fullDose() * candidate.removedArea / originalArea();
+
+    return {
+      ...candidate,
+      dosage,
+      message:
+        `Preview: ${candidate.length.toFixed(3)} cm cut, ` +
+        `${candidate.removedArea.toFixed(3)} cm² area, ${dosage.toFixed(3)} mg.` +
+        autoDirectionMessage(candidate.direction)
+    };
+  }
+
+  function segmentLength(seg) {
+    if (!seg) return 0;
+    return Math.hypot(
+      seg.b.x - seg.a.x,
+      seg.b.y - seg.a.y
+    );
+  }
+
+  function cutHandle(index) {
+    const seg = cutSegmentThroughPiece(index) || cutSegmentThroughCircle(index);
+
+    if (!seg) return null;
+
+    return {
+      x: (seg.a.x + seg.b.x) / 2,
+      y: (seg.a.y + seg.b.y) / 2
+    };
+  }
+
+  // Hit testing is done directly in CSS canvas pixels.
+  // This uses the exact same handle center that drawCut() paints.
+  function findHandleCanvas(canvasPoint) {
+    for (let i = cuts.length - 1; i >= 0; i--) {
+      const handle = cutHandle(i);
+      if (!handle) continue;
+
+      const H = toCanvas(handle);
+      const distance = Math.hypot(
+        canvasPoint.x - H.x,
+        canvasPoint.y - H.y
+      );
+
+      if (distance <= HANDLE_HIT_PX) {
+        return i;
+      }
+    }
+
+    return -1;
+  }
+
+  function lineDistanceCanvasPx(canvasPoint, cut) {
+    const a = toCanvas(cut.a);
+    const b = toCanvas(cut.b);
+
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const len = Math.hypot(dx, dy);
+
+    if (len < 1e-9) return Infinity;
+
+    return Math.abs(
+      (canvasPoint.x - a.x) * dy -
+      (canvasPoint.y - a.y) * dx
+    ) / len;
+  }
+
+  function findLineCanvas(canvasPoint) {
+    let bestIndex = -1;
+    let bestDistance = Infinity;
+
+    cuts.forEach((cut, i) => {
+      const d = lineDistanceCanvasPx(canvasPoint, cut);
+
+      if (d < bestDistance) {
+        bestDistance = d;
+        bestIndex = i;
+      }
+    });
+
+    return bestDistance <= LINE_HIT_PX
+      ? bestIndex
+      : -1;
+  }
+
+  function lineUnitNormal(cut) {
+    const dx = cut.b.x - cut.a.x;
+    const dy = cut.b.y - cut.a.y;
+    const len = Math.hypot(dx, dy);
+
+    if (len < 1e-12) return null;
+
+    // Positive cross-product side of a -> b.
+    return {
+      x: -dy / len,
+      y: dx / len
+    };
+  }
+
+  function signedCenterDistance(cut) {
+    const dx = cut.b.x - cut.a.x;
+    const dy = cut.b.y - cut.a.y;
+    const len = Math.hypot(dx, dy);
+
+    if (len < 1e-12) return 0;
+
+    return cross(cut.a, cut.b, { x: 0, y: 0 }) / len;
+  }
+
+  function centerOffset(cut) {
+    return Math.abs(signedCenterDistance(cut));
+  }
+
+  function sideRimDepths(cut) {
+    const r = radius();
+    const q = signedCenterDistance(cut);
+
+    // Signed distances of the circle along the positive-cross side
+    // range from q-r to q+r.
+    const positiveSide = Math.max(0, q + r);
+    const negativeSide = Math.max(0, r - q);
+
+    if (cut.removeSign > 0) {
+      return {
+        removed: positiveSide,
+        kept: negativeSide
+      };
+    }
+
+    return {
+      removed: negativeSide,
+      kept: positiveSide
+    };
+  }
+
+  function angleDifferenceDeg(a, b) {
+    const a1 = Math.atan2(a.b.y - a.a.y, a.b.x - a.a.x);
+    const a2 = Math.atan2(b.b.y - b.a.y, b.b.x - b.a.x);
+
+    let diff = Math.abs((a1 - a2) * 180 / Math.PI) % 180;
+    if (diff > 90) diff = 180 - diff;
+
+    return diff;
+  }
+
+  function perpendicularDistanceBetweenLines(a, b) {
+    const dx = a.b.x - a.a.x;
+    const dy = a.b.y - a.a.y;
+    const len = Math.hypot(dx, dy);
+
+    if (len < 1e-12) return NaN;
+
+    return Math.abs(cross(a.a, a.b, b.a)) / len;
+  }
+
+  function distancePointToLine(point, line) {
+    const dx = line.b.x - line.a.x;
+    const dy = line.b.y - line.a.y;
+    const len = Math.hypot(dx, dy);
+
+    if (len < 1e-12) return NaN;
+
+    return Math.abs(cross(line.a, line.b, point)) / len;
+  }
+
+
+  function projectPointToLine(point, line) {
+    const dx = line.b.x - line.a.x;
+    const dy = line.b.y - line.a.y;
+    const len2 = dx * dx + dy * dy;
+
+    if (len2 < 1e-12) return { ...line.a };
+
+    const t =
+      ((point.x - line.a.x) * dx +
+       (point.y - line.a.y) * dy) / len2;
+
+    return {
+      x: line.a.x + t * dx,
+      y: line.a.y + t * dy
+    };
+  }
+
+  function addPhysical(a, b) {
+    return { x: a.x + b.x, y: a.y + b.y };
+  }
+
+  function scalePhysical(v, amount) {
+    return { x: v.x * amount, y: v.y * amount };
+  }
+
+  function drawArrowHead(from, to, color) {
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const len = Math.hypot(dx, dy);
+
+    if (len < 1e-6) return;
+
+    const ux = dx / len;
+    const uy = dy / len;
+    const size = 7;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(to.x, to.y);
+    ctx.lineTo(
+      to.x - ux * size - uy * size * .55,
+      to.y - uy * size + ux * size * .55
+    );
+    ctx.moveTo(to.x, to.y);
+    ctx.lineTo(
+      to.x - ux * size + uy * size * .55,
+      to.y - uy * size - ux * size * .55
+    );
+    ctx.lineWidth = 1.7;
+    ctx.strokeStyle = color;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawDimensionLabel(x, y, label, color) {
+    ctx.save();
+    ctx.font = '700 11px system-ui';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    const padX = 6;
+    const h = 20;
+    const w = ctx.measureText(label).width + padX * 2;
+
+    const v = view();
+    const cx = Math.max(w / 2 + 3, Math.min(v.width - w / 2 - 3, x));
+    const cy = Math.max(h / 2 + 3, Math.min(v.height - h / 2 - 3, y));
+
+    ctx.fillStyle = 'rgba(255,255,255,.95)';
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.2;
+
+    if (ctx.roundRect) {
+      ctx.beginPath();
+      ctx.roundRect(cx - w / 2, cy - h / 2, w, h, 6);
+      ctx.fill();
+      ctx.stroke();
+    } else {
+      ctx.fillRect(cx - w / 2, cy - h / 2, w, h);
+      ctx.strokeRect(cx - w / 2, cy - h / 2, w, h);
+    }
+
+    ctx.fillStyle = '#222';
+    ctx.fillText(label, cx, cy + .5);
+    ctx.restore();
+  }
+
+  function drawDimensionLine(p1Physical, p2Physical, label, color, options = {}) {
+    const p1 = toCanvas(p1Physical);
+    const p2 = toCanvas(p2Physical);
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
+    ctx.lineWidth = options.lineWidth || 1.6;
+    ctx.strokeStyle = color;
+    ctx.setLineDash(options.dashed ? [5, 4] : []);
+    ctx.stroke();
+    ctx.restore();
+
+    drawArrowHead(p2, p1, color);
+    drawArrowHead(p1, p2, color);
+
+    const mx = (p1.x + p2.x) / 2;
+    const my = (p1.y + p2.y) / 2;
+
+    const labelOffsetX = options.labelOffsetX || 0;
+    const labelOffsetY = options.labelOffsetY || 0;
+
+    drawDimensionLabel(
+      mx + labelOffsetX,
+      my + labelOffsetY,
+      label,
+      color
+    );
+  }
+
+  function drawExtensionLine(fromPhysical, toPhysical, color) {
+    const a = toCanvas(fromPhysical);
+    const b = toCanvas(toPhysical);
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = color;
+    ctx.globalAlpha = .55;
+    ctx.setLineDash([3, 3]);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawSelectedMeasurements() {
+    if (selectedCut < 0 || selectedCut >= cuts.length) return;
+
+    const cut = cuts[selectedCut];
+    const color = cut.color;
+    const normal = lineUnitNormal(cut);
+
+    if (!normal) return;
+
+    // ------------------------------------------------------------
+    // 1) Cut length through the current piece
+    // ------------------------------------------------------------
+    const pieceSeg = cutSegmentThroughPiece(selectedCut);
+
+    if (pieceSeg) {
+      const length = segmentLength(pieceSeg);
+
+      // Place the dimension line slightly toward the KEPT side, so it
+      // doesn't sit directly on top of the colored cut.
+      const keptDirection =
+        cut.removeSign > 0
+          ? scalePhysical(normal, -1)
+          : normal;
+
+      const offsetPhysical = 20 / view().scale;
+
+      const d1 = addPhysical(
+        pieceSeg.a,
+        scalePhysical(keptDirection, offsetPhysical)
+      );
+
+      const d2 = addPhysical(
+        pieceSeg.b,
+        scalePhysical(keptDirection, offsetPhysical)
+      );
+
+      drawExtensionLine(pieceSeg.a, d1, color);
+      drawExtensionLine(pieceSeg.b, d2, color);
+
+      drawDimensionLine(
+        d1,
+        d2,
+        `Cut length ${length.toFixed(2)} cm`,
+        color,
+        { labelOffsetY: -13 }
+      );
+    }
+
+    // ------------------------------------------------------------
+    // 2) Removed-side rim depth
+    // ------------------------------------------------------------
+    const removedDirection =
+      cut.removeSign > 0
+        ? normal
+        : scalePhysical(normal, -1);
+
+    const rimPoint =
+      scalePhysical(removedDirection, radius());
+
+    const lineFoot =
+      projectPointToLine(rimPoint, cut);
+
+    const removedDepth =
+      Math.hypot(
+        rimPoint.x - lineFoot.x,
+        rimPoint.y - lineFoot.y
+      );
+
+    if (removedDepth > 1e-7) {
+      // Shift the whole ruler a little along the cut direction so the
+      // dimension doesn't run directly through the drag handle.
+      const dx = cut.b.x - cut.a.x;
+      const dy = cut.b.y - cut.a.y;
+      const lineLen = Math.hypot(dx, dy);
+
+      const tangent =
+        lineLen > 1e-12
+          ? { x: dx / lineLen, y: dy / lineLen }
+          : { x: 1, y: 0 };
+
+      const shift = 12 / view().scale;
+
+      const footShifted =
+        addPhysical(lineFoot, scalePhysical(tangent, shift));
+
+      const rimShifted =
+        addPhysical(rimPoint, scalePhysical(tangent, shift));
+
+      drawExtensionLine(lineFoot, footShifted, color);
+      drawExtensionLine(rimPoint, rimShifted, color);
+
+      drawDimensionLine(
+        footShifted,
+        rimShifted,
+        `Removed rim ${removedDepth.toFixed(2)} cm`,
+        color,
+        { labelOffsetX: 8 }
+      );
+    }
+
+    // ------------------------------------------------------------
+    // 3) Previous cut spacing
+    // ------------------------------------------------------------
+    if (selectedCut > 0) {
+      const previous = cuts[selectedCut - 1];
+      const handle = cutHandle(selectedCut);
+
+      if (handle) {
+        const projection =
+          projectPointToLine(handle, previous);
+
+        const spacing =
+          Math.hypot(
+            handle.x - projection.x,
+            handle.y - projection.y
+          );
+
+        const angle =
+          angleDifferenceDeg(cut, previous);
+
+        const suffix =
+          angle <= PARALLEL_TOLERANCE_DEG
+            ? ''
+            : '*';
+
+        if (spacing > 1e-7) {
+          drawDimensionLine(
+            handle,
+            projection,
+            `Prev spacing${suffix} ${spacing.toFixed(2)} cm`,
+            previous.color,
+            {
+              dashed: angle > PARALLEL_TOLERANCE_DEG,
+              labelOffsetY: 13
+            }
+          );
+        }
+      }
+    }
+  }
+
+
+  function hideMeasurePopover(delay = 80) {
+    if (popoverPinned) return;
+
+    clearTimeout(popoverHideTimer);
+    popoverHideTimer = setTimeout(() => {
+      if (popoverPinned) return;
+      measurePopover.classList.remove('visible');
+      popoverCut = -1;
+    }, delay);
+  }
+
+  function showMeasurePopover(index) {
+    if (index < 0 || index >= cuts.length) {
+      hideMeasurePopover(0);
+      return;
+    }
+
+    clearTimeout(popoverHideTimer);
+    popoverCut = index;
+
+    const cut = cuts[index];
+    const handle = cutHandle(index);
+
+    if (!handle) {
+      hideMeasurePopover(0);
+      return;
+    }
+
+    const H = toCanvas(handle);
+    const rect = canvas.getBoundingClientRect();
+
+    const popoverHalfWidth = 124;
+    const x = Math.max(
+      popoverHalfWidth + 8,
+      Math.min(rect.width - popoverHalfWidth - 8, H.x)
+    );
+
+    const needsBelow = H.y < 175;
+
+    measurePopover.style.left = `${x}px`;
+
+    if (needsBelow) {
+      measurePopover.style.top = `${Math.min(rect.height - 8, H.y + 24)}px`;
+      measurePopover.style.transform = 'translate(-50%, 0) scale(1)';
+      measurePopover.style.transformOrigin = 'top center';
+    } else {
+      measurePopover.style.top = `${H.y}px`;
+      measurePopover.style.transform = '';
+      measurePopover.style.transformOrigin = '';
+    }
+
+    measureDot.style.background = cut.color;
+    measureTitle.textContent = `Cut ${index + 1}`;
+
+    const pieceLength =
+      segmentLength(cutSegmentThroughPiece(index));
+
+    const area = cutArea(index);
+    const dose = cutDose(index);
+
+    if (document.activeElement !== hoverCurrentDoseInput) {
+      hoverCurrentDoseInput.value = dose.toFixed(3);
+    }
+
+    if (document.activeElement !== hoverCurrentAreaInput) {
+      hoverCurrentAreaInput.value = area.toFixed(2);
+    }
+
+    if (document.activeElement !== hoverCutLengthInput) {
+      hoverCutLengthInput.value = pieceLength.toFixed(2);
+    }
+
+    measurePopover.classList.add('visible');
+  }
+
+  function cutLengthForTranslatedCut(index, base, t) {
+    const moved = translatedCut(base, t);
+    if (!moved) return 0;
+
+    const original = cuts[index];
+    cuts[index] = moved;
+
+    const seg = cutSegmentThroughPiece(index);
+    const length = segmentLength(seg);
+
+    cuts[index] = original;
+    return length;
+  }
+
+
+  function cutAreaForTranslatedCut(index, base, t) {
+    const moved = translatedCut(base, t);
+    if (!moved) return cutArea(index);
+
+    const movedCuts = cuts.map((cut, cutIndex) =>
+      cutIndex === index ? moved : cut
+    );
+
+    return cutAreaForCuts(movedCuts, index);
+  }
+
+  function adjustCutToArea(index, targetArea) {
+    if (index < 0 || index >= cuts.length) return false;
+    if (!Number.isFinite(targetArea)) return false;
+
+    const maxArea = polygonArea(remainingPolygon(index));
+
+    if (targetArea < 0 || targetArea > maxArea) {
+      statusEl.textContent = 'Area out of range:';
+      instructionEl.textContent =
+        ` enter an area between 0 and ${maxArea.toFixed(2)} cm² for this cut.`;
+      return false;
+    }
+
+    const base = {
+      a: { ...cuts[index].a },
+      b: { ...cuts[index].b },
+      removeSign: cuts[index].removeSign,
+      color: cuts[index].color
+    };
+
+    const span = diameter() * 2.5;
+    const samples = 360;
+
+    let best = {
+      t: 0,
+      error: Math.abs(
+        cutAreaForTranslatedCut(index, base, 0) - targetArea
+      )
+    };
+
+    const roots = [];
+
+    let previousT = -span;
+    let previousValue =
+      cutAreaForTranslatedCut(index, base, previousT) - targetArea;
+
+    for (let i = 1; i <= samples; i++) {
+      const t = -span + (2 * span * i / samples);
+      const value =
+        cutAreaForTranslatedCut(index, base, t) - targetArea;
+
+      const error = Math.abs(value);
+      if (error < best.error) best = { t, error };
+
+      if (
+        previousValue === 0 ||
+        value === 0 ||
+        previousValue * value < 0
+      ) {
+        let lo = previousT;
+        let hi = t;
+        let flo = previousValue;
+
+        for (let j = 0; j < 70; j++) {
+          const mid = (lo + hi) / 2;
+          const fm =
+            cutAreaForTranslatedCut(index, base, mid) - targetArea;
+
+          if (Math.abs(fm) < 1e-8) {
+            lo = hi = mid;
+            break;
+          }
+
+          if (flo * fm <= 0) {
+            hi = mid;
+          } else {
+            lo = mid;
+            flo = fm;
+          }
+        }
+
+        roots.push((lo + hi) / 2);
+      }
+
+      previousT = t;
+      previousValue = value;
+    }
+
+    let chosenT = null;
+
+    if (roots.length) {
+      chosenT = roots.reduce(
+        (bestT, t) =>
+          Math.abs(t) < Math.abs(bestT) ? t : bestT,
+        roots[0]
+      );
+    } else if (best.error <= Math.max(0.02, maxArea * 0.00002)) {
+      chosenT = best.t;
+    }
+
+    if (chosenT === null) {
+      statusEl.textContent = 'Area not reachable by this cut:';
+      instructionEl.textContent =
+        ' earlier cuts limit this cut area while its angle stays fixed.';
+      return false;
+    }
+
+    cuts[index] = translatedCut(base, chosenT);
+    selectedCut = index;
+
+    statusEl.textContent = `Cut ${index + 1} adjusted:`;
+    instructionEl.textContent =
+      ` its area is now about ${targetArea.toFixed(4)} cm².`;
+
+    draw();
+    showMeasurePopover(index);
+    return true;
+  }
+
+  function adjustCutToDose(index, targetDoseValue) {
+    const full = fullDose();
+
+    if (!(full > 0)) {
+      statusEl.textContent = 'Invalid full dosage:';
+      instructionEl.textContent =
+        ' enter a full-patch dosage greater than 0 first.';
+      return false;
+    }
+
+    const maxDose = full * polygonArea(remainingPolygon(index)) / originalArea();
+
+    if (
+      !Number.isFinite(targetDoseValue) ||
+      targetDoseValue < 0 ||
+      targetDoseValue > maxDose
+    ) {
+      statusEl.textContent = 'Dosage out of range:';
+      instructionEl.textContent =
+        ` enter an area dosage between 0 and ${maxDose.toFixed(3)} mg for this cut.`;
+      return false;
+    }
+
+    const targetArea =
+      originalArea() * targetDoseValue / full;
+
+    const ok = adjustCutToArea(index, targetArea);
+
+    if (ok) {
+      statusEl.textContent = `Cut ${index + 1} adjusted:`;
+      instructionEl.textContent =
+        ` its area dosage is now about ${targetDoseValue.toFixed(3)} mg.`;
+    }
+
+    return ok;
+  }
+
+  function adjustCutToLength(index, targetLength) {
+    if (index < 0 || index >= cuts.length) return false;
+    if (!Number.isFinite(targetLength) || targetLength < 0) return false;
+
+    const base = {
+      a: { ...cuts[index].a },
+      b: { ...cuts[index].b },
+      removeSign: cuts[index].removeSign,
+      color: cuts[index].color
+    };
+
+    const maxPossible = diameter() * 1.05;
+
+    if (targetLength > maxPossible) {
+      statusEl.textContent = 'Cut length too large:';
+      instructionEl.textContent =
+        ` enter a value no greater than about ${diameter().toFixed(2)} cm for this circle.`;
+      return false;
+    }
+
+    // Search along the line's normal. For a convex current piece the chord
+    // length is continuous but may have two valid positions, so scan first,
+    // then solve every bracket and choose the closest solution to the current cut.
+    const span = diameter() * 1.6;
+    const samples = 320;
+
+    let candidates = [];
+    let previousT = -span;
+    let previousValue =
+      cutLengthForTranslatedCut(index, base, previousT) - targetLength;
+
+    // If the current position already matches closely, keep it.
+    const currentLength =
+      cutLengthForTranslatedCut(index, base, 0);
+
+    if (Math.abs(currentLength - targetLength) <= 0.005) {
+      return true;
+    }
+
+    let bestApprox = {
+      t: 0,
+      error: Math.abs(currentLength - targetLength)
+    };
+
+    for (let i = 1; i <= samples; i++) {
+      const t = -span + (2 * span * i / samples);
+      const value =
+        cutLengthForTranslatedCut(index, base, t) - targetLength;
+
+      const err = Math.abs(value);
+      if (err < bestApprox.error) {
+        bestApprox = { t, error: err };
+      }
+
+      if (
+        previousValue === 0 ||
+        value === 0 ||
+        previousValue * value < 0
+      ) {
+        let lo = previousT;
+        let hi = t;
+        let flo = previousValue;
+        let fhi = value;
+
+        for (let j = 0; j < 70; j++) {
+          const mid = (lo + hi) / 2;
+          const fm =
+            cutLengthForTranslatedCut(index, base, mid) - targetLength;
+
+          if (Math.abs(fm) < 1e-7) {
+            lo = hi = mid;
+            break;
+          }
+
+          if (flo * fm <= 0) {
+            hi = mid;
+            fhi = fm;
+          } else {
+            lo = mid;
+            flo = fm;
+          }
+        }
+
+        candidates.push((lo + hi) / 2);
+      }
+
+      previousT = t;
+      previousValue = value;
+    }
+
+    let chosenT = null;
+
+    if (candidates.length) {
+      // Choose the solution requiring the least movement.
+      chosenT = candidates.reduce(
+        (best, t) =>
+          Math.abs(t) < Math.abs(best) ? t : best,
+        candidates[0]
+      );
+    } else if (bestApprox.error <= 0.03) {
+      chosenT = bestApprox.t;
+    }
+
+    if (chosenT === null) {
+      statusEl.textContent = 'Length not reachable:';
+      instructionEl.textContent =
+        ' that cut length cannot be produced by sliding this cut while keeping its angle and the earlier cuts fixed.';
+      return false;
+    }
+
+    cuts[index] = translatedCut(base, chosenT);
+    selectedCut = index;
+
+    statusEl.textContent = `Cut ${index + 1} adjusted:`;
+    instructionEl.textContent =
+      ` cut length set to about ${targetLength.toFixed(2)} cm.`;
+
+    draw();
+    showMeasurePopover(index);
+    return true;
+  }
+
+  function drawRemainingShape() {
+    const v = view();
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(v.cx, v.cy, v.rPx, 0, Math.PI * 2);
+    ctx.fillStyle = '#ecece7';
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#8a8a83';
+    ctx.stroke();
+    ctx.restore();
+
+    cuts.forEach((cut, index) => {
+      const poly = cutAreaPolygonForCuts(cuts, index);
+      if (!poly.length) return;
+
+      const first = toCanvas(poly[0]);
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(first.x, first.y);
+
+      poly.slice(1).forEach(point => {
+        const p = toCanvas(point);
+        ctx.lineTo(p.x, p.y);
+      });
+
+      ctx.closePath();
+      ctx.fillStyle = cut.color;
+      ctx.globalAlpha = index === selectedCut ? 0.32 : 0.16;
+      ctx.fill();
+
+      if (index === selectedCut) {
+        ctx.globalAlpha = 0.9;
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = cut.color;
+        ctx.stroke();
+      }
+
+      ctx.restore();
+    });
+
+    const poly = remainingPolygon();
+
+    if (!poly.length) return;
+
+    const first = toCanvas(poly[0]);
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(first.x, first.y);
+
+    for (let i = 1; i < poly.length; i++) {
+      const p = toCanvas(poly[i]);
+      ctx.lineTo(p.x, p.y);
+    }
+
+    ctx.closePath();
+    ctx.fillStyle = '#fff';
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#171717';
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawCut(index) {
+    const cut = cuts[index];
+    const seg = cutSegmentThroughCircle(index);
+
+    if (!seg) return;
+
+    const A = toCanvas(seg.a);
+    const B = toCanvas(seg.b);
+
+    const selected = index === selectedCut;
+    const hovered =
+      index === hoveredLine ||
+      index === hoveredHandle ||
+      index === hoveredArea;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(A.x, A.y);
+    ctx.lineTo(B.x, B.y);
+    ctx.lineWidth = selected ? 5 : hovered ? 4 : 3;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = cut.color;
+    ctx.stroke();
+    ctx.restore();
+
+    const handle = cutHandle(index);
+    if (!handle) return;
+
+    const H = toCanvas(handle);
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(H.x, H.y, HANDLE_RADIUS_PX, 0, Math.PI * 2);
+    ctx.fillStyle = cut.color;
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#fff';
+    ctx.stroke();
+
+    if (index === hoveredHandle || selected) {
+      ctx.beginPath();
+      ctx.arc(
+        H.x,
+        H.y,
+        index === hoveredHandle ? HANDLE_HIT_PX : HANDLE_RADIUS_PX + 4,
+        0,
+        Math.PI * 2
+      );
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = cut.color;
+      ctx.globalAlpha = index === hoveredHandle ? 0.35 : 1;
+      ctx.stroke();
+
+      // While hovering, lightly fill the entire active drag zone.
+      if (index === hoveredHandle) {
+        ctx.globalAlpha = 0.07;
+        ctx.fillStyle = cut.color;
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    // Small cut number inside the handle.
+    ctx.fillStyle = '#fff';
+    ctx.font = '700 11px system-ui';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(String(index + 1), H.x, H.y + .5);
+    ctx.restore();
+
+  }
+
+  function drawPreviewLine(a, b) {
+    const v = view();
+    const A = toCanvas(a);
+    const B = toCanvas(b);
+
+    const dx = B.x - A.x;
+    const dy = B.y - A.y;
+    const len = Math.hypot(dx, dy);
+
+    if (len < 1e-6) return;
+
+    const ux = dx / len;
+    const uy = dy / len;
+    const L = Math.max(v.width, v.height) * 2;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(A.x - ux * L, A.y - uy * L);
+    ctx.lineTo(A.x + ux * L, A.y + uy * L);
+    ctx.lineWidth = 2;
+    ctx.setLineDash([7, 7]);
+    ctx.strokeStyle = COLORS[nextColor % COLORS.length];
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function updateMeasuredCutControls() {
+    const hasPreviousCut = cuts.length > 0;
+
+    if (hasPreviousCut && linkedStartInput.value === 'first') {
+      linkedStartInput.value = 'a';
+    }
+
+    if (!hasPreviousCut) {
+      linkedStartInput.value = 'first';
+      linkedDirectionInput.value = 'auto';
+    }
+
+    linkedStartInput.disabled = !hasPreviousCut;
+    linkedLengthInput.disabled = false;
+    linkedDoseInput.disabled = false;
+    linkedDirectionInput.disabled = !hasPreviousCut;
+
+    const preview = measuredCutPreview();
+
+    if (linkedMeasurementSource === 'length') {
+      if (document.activeElement !== linkedDoseInput) {
+        linkedDoseInput.value = preview.ok
+          ? preview.dosage.toFixed(3)
+          : '';
+      }
+    } else if (document.activeElement !== linkedLengthInput) {
+      linkedLengthInput.value = preview.ok
+        ? preview.length.toFixed(3)
+        : '';
+    }
+
+    const displayedLength = Number(linkedLengthInput.value);
+
+    linkedRoundBtn.disabled =
+      !Number.isFinite(displayedLength) ||
+      displayedLength <= 0;
+    linkedAddBtn.disabled = !preview.ok;
+    linkedStatusEl.textContent = preview.message;
+    linkedStatusEl.className =
+      'measured-cut-status' + (preview.ok ? ' valid' : '');
+
+    return preview;
+  }
+
+  function drawMeasuredCutGuides(preview) {
+    if (cuts.length) {
+      const previousIndex = cuts.length - 1;
+      const previousSegment = cutSegmentThroughCircle(previousIndex);
+
+      if (previousSegment) {
+        const previousColor = cuts[previousIndex].color;
+        const selectedEndpoint = linkedStartInput.value;
+        const endpoints = [
+          { key: 'a', label: 'A', point: previousSegment.a },
+          { key: 'b', label: 'B', point: previousSegment.b }
+        ];
+
+        endpoints.forEach(endpoint => {
+          const p = toCanvas(endpoint.point);
+          const selected = endpoint.key === selectedEndpoint;
+
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, selected ? 12 : 10, 0, Math.PI * 2);
+          ctx.fillStyle = selected ? previousColor : '#fff';
+          ctx.fill();
+          ctx.lineWidth = selected ? 3 : 2;
+          ctx.strokeStyle = previousColor;
+          ctx.stroke();
+          ctx.fillStyle = selected ? '#fff' : previousColor;
+          ctx.font = '800 11px system-ui';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(endpoint.label, p.x, p.y + .5);
+          ctx.restore();
+        });
+      }
+    }
+
+    if (!preview.ok) return;
+
+    const start = toCanvas(preview.cut.a);
+    const end = toCanvas(preview.cut.b);
+    const color = COLORS[nextColor % COLORS.length];
+    const midpoint = {
+      x: (start.x + end.x) / 2,
+      y: (start.y + end.y) / 2
+    };
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(start.x, start.y);
+    ctx.lineTo(end.x, end.y);
+    ctx.setLineDash([9, 7]);
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = color;
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.beginPath();
+    ctx.arc(end.x, end.y, 7, 0, Math.PI * 2);
+    ctx.fillStyle = '#fff';
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = color;
+    ctx.stroke();
+
+    ctx.font = '750 12px system-ui';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#fff';
+    ctx.strokeText(`${preview.length.toFixed(3)} cm`, midpoint.x, midpoint.y - 7);
+    ctx.fillStyle = color;
+    ctx.fillText(`${preview.length.toFixed(3)} cm`, midpoint.x, midpoint.y - 7);
+    ctx.restore();
+  }
+
+  function draw() {
+    const v = view();
+    ctx.clearRect(0, 0, v.width, v.height);
+
+    const measuredPreview = updateMeasuredCutControls();
+
+    drawRemainingShape();
+
+    cuts.forEach((_, i) => drawCut(i));
+    drawMeasuredCutGuides(measuredPreview);
+
+    if (
+      drawStage === 'secondPoint' &&
+      firstPoint &&
+      previewPoint
+    ) {
+      const snapped = snapSecondPoint(firstPoint, previewPoint);
+      drawPreviewLine(firstPoint, snapped);
+    }
+
+    if (drawStage === 'chooseSide' && pendingLine) {
+      drawPreviewLine(pendingLine.a, pendingLine.b);
+    }
+
+    if (drawStage === 'secondPoint' && firstPoint) {
+      const p = toCanvas(firstPoint);
+
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+      ctx.fillStyle = COLORS[nextColor % COLORS.length];
+      ctx.fill();
+    }
+
+    updateSidebar();
+
+    if (popoverCut >= 0 && measurePopover.classList.contains('visible')) {
+      showMeasurePopover(popoverCut);
+    }
+  }
+
+  function updateSidebar() {
+    const remainingArea = polygonArea(remainingPolygon());
+
+    sidebarPatchAreaEl.textContent = `${originalArea().toFixed(4)} cm²`;
+    sidebarRemainingAreaEl.textContent = `${remainingArea.toFixed(4)} cm²`;
+
+    const hasSelected =
+      selectedCut >= 0 &&
+      selectedCut < cuts.length;
+    const selectionChanged = selectedCut !== sidebarMeasurementCut;
+
+    const area = hasSelected ? cutArea(selectedCut) : remainingArea;
+    const dose = hasSelected ? cutDose(selectedCut) : currentDose();
+
+    currentDoseNameEl.textContent = hasSelected
+      ? `Area ${selectedCut + 1} dosage`
+      : 'Uncut remaining dosage';
+    currentDoseEl.textContent = `${dose.toFixed(3)} mg`;
+
+    sideCurrentDoseInput.disabled = !hasSelected;
+    sideCurrentAreaInput.disabled = !hasSelected;
+    sideCutLengthInput.disabled = !hasSelected;
+
+    if (
+      selectionChanged ||
+      document.activeElement !== sideCurrentDoseInput
+    ) {
+      sideCurrentDoseInput.value =
+        hasSelected ? dose.toFixed(3) : '';
+    }
+
+    if (
+      selectionChanged ||
+      document.activeElement !== sideCurrentAreaInput
+    ) {
+      sideCurrentAreaInput.value =
+        hasSelected ? area.toFixed(4) : '';
+    }
+
+    if (
+      selectionChanged ||
+      document.activeElement !== sideCutLengthInput
+    ) {
+      const length =
+        hasSelected
+          ? segmentLength(cutSegmentThroughPiece(selectedCut))
+          : NaN;
+
+      sideCutLengthInput.value =
+        hasSelected && Number.isFinite(length)
+          ? length.toFixed(3)
+          : '';
+    }
+
+    sidebarMeasurementCut = selectedCut;
+
+    if (!hasSelected) {
+      refChordLengthEl.textContent = '—';
+      refCenterOffsetEl.textContent = '—';
+      refKeptRimEl.textContent = '—';
+      refRemovedRimEl.textContent = '—';
+      refPreviousSpacingEl.textContent = '—';
+      refPreviousAngleEl.textContent = '—';
+
+      renderCutList();
+      return;
+    }
+
+    const cut = cuts[selectedCut];
+    const circleChord =
+      segmentLength(cutSegmentThroughCircle(selectedCut));
+    const rim = sideRimDepths(cut);
+
+    refChordLengthEl.textContent =
+      `${circleChord.toFixed(3)} cm`;
+
+    refCenterOffsetEl.textContent =
+      `${centerOffset(cut).toFixed(3)} cm`;
+
+    refKeptRimEl.textContent =
+      `${rim.kept.toFixed(3)} cm`;
+
+    refRemovedRimEl.textContent =
+      `${rim.removed.toFixed(3)} cm`;
+
+    if (selectedCut === 0) {
+      refPreviousSpacingEl.textContent = 'No previous cut';
+      refPreviousAngleEl.textContent = '—';
+    } else {
+      const previous = cuts[selectedCut - 1];
+      const angle = angleDifferenceDeg(cut, previous);
+
+      refPreviousAngleEl.textContent =
+        `${angle.toFixed(1)}°`;
+
+      if (angle <= PARALLEL_TOLERANCE_DEG) {
+        refPreviousSpacingEl.textContent =
+          `${perpendicularDistanceBetweenLines(previous, cut).toFixed(3)} cm`;
+      } else {
+        const handle = cutHandle(selectedCut);
+
+        refPreviousSpacingEl.textContent =
+          handle
+            ? `${distancePointToLine(handle, previous).toFixed(3)} cm*`
+            : '—';
+      }
+    }
+
+    renderCutList();
+  }
+
+  function renderCutList() {
+    if (!cuts.length) {
+      cutList.className = 'muted';
+      cutList.textContent = 'No cuts yet.';
+      return;
+    }
+
+    cutList.className = '';
+    cutList.innerHTML = '';
+
+    cuts.forEach((cut, i) => {
+      const row = document.createElement('div');
+      row.className =
+        'cut-row' + (i === selectedCut ? ' selected' : '');
+
+      const swatch = document.createElement('span');
+      swatch.className = 'swatch';
+      swatch.style.background = cut.color;
+
+      const name = document.createElement('span');
+      const len = segmentLength(cutSegmentThroughPiece(i));
+      const area = cutArea(i);
+      name.textContent =
+        `Area ${i + 1} · ${area.toFixed(3)} cm² · cut ${len.toFixed(3)} cm`;
+
+      const select = document.createElement('button');
+      select.textContent = 'Select';
+      select.setAttribute('aria-pressed', String(i === selectedCut));
+      select.onclick = () => {
+        selectedCut = i;
+        drawStage = 'idle';
+        setReadyMessage();
+        draw();
+      };
+
+      const del = document.createElement('button');
+      del.textContent = 'Delete';
+      del.onclick = () => {
+        pushSnapshot();
+        cuts = cuts.filter((_, cutIndex) => cutIndex !== i);
+
+        if (selectedCut === i) selectedCut = -1;
+        else if (selectedCut > i) selectedCut--;
+
+        draw();
+      };
+
+      row.append(swatch, name, select, del);
+      cutList.appendChild(row);
+    });
+  }
+
+  function setReadyMessage() {
+    statusEl.textContent = 'Ready:';
+    instructionEl.textContent =
+      ' click empty space twice to draw a cut. Click a cut to select it. Drag its colored circular handle to move it.';
+  }
+
+  function addCut(a, b, removeSign) {
+    pushSnapshot();
+
+    cuts = [...cuts, {
+      a: { ...a },
+      b: { ...b },
+      removeSign,
+      color: COLORS[nextColor % COLORS.length]
+    }];
+
+    nextColor++;
+    selectedCut = cuts.length - 1;
+  }
+
+  function addMeasuredEndpointCut() {
+    const preview = measuredCutPreview();
+
+    if (!preview.ok) {
+      linkedStatusEl.textContent = preview.message;
+      linkedStatusEl.className = 'measured-cut-status';
+      return;
+    }
+
+    const addingFirstCut = cuts.length === 0;
+
+    addCut(
+      preview.cut.a,
+      preview.cut.b,
+      preview.cut.removeSign
+    );
+
+    // Cut 1 starts a new chain. Later generated cuts continue from their new End B.
+    linkedStartInput.value = addingFirstCut ? 'a' : 'b';
+    drawStage = 'idle';
+    firstPoint = null;
+    pendingLine = null;
+
+    if (addingFirstCut) {
+      statusEl.textContent = 'Cut 1 added from a measured value:';
+      instructionEl.textContent =
+        ` the ${preview.length.toFixed(3)} cm horizontal cut removes the top area. ` +
+        'The next measured cut can start from End A or End B.';
+    } else {
+      statusEl.textContent = `Cut ${selectedCut + 1} added from a measured endpoint:`;
+      instructionEl.textContent =
+        ` the cut length is ${preview.length.toFixed(3)} cm. ` +
+        `${preview.direction} direction and angle were calculated automatically.`;
+    }
+
+    draw();
+  }
+
+  function roundMeasuredCutLength() {
+    const length = Number(linkedLengthInput.value);
+    if (!Number.isFinite(length) || length <= 0) return;
+
+    linkedLengthInput.value = (Math.round(length * 10) / 10).toFixed(1);
+    linkedMeasurementSource = 'length';
+    draw();
+    linkedLengthInput.select();
+  }
+
+
+  function translatedCut(base, t) {
+    const dx = base.b.x - base.a.x;
+    const dy = base.b.y - base.a.y;
+    const len = Math.hypot(dx, dy);
+
+    if (len < 1e-12) return null;
+
+    const nx = -dy / len;
+    const ny = dx / len;
+
+    return {
+      a: {
+        x: base.a.x + nx * t,
+        y: base.a.y + ny * t
+      },
+      b: {
+        x: base.b.x + nx * t,
+        y: base.b.y + ny * t
+      },
+      removeSign: base.removeSign,
+      color: base.color
+    };
+  }
+
+  canvas.addEventListener('pointermove', evt => {
+    const canvasPoint = pointerCanvas(evt);
+
+    if (isPanning && panStartCanvas) {
+      viewPanX = panStartX + (canvasPoint.x - panStartCanvas.x);
+      viewPanY = panStartY + (canvasPoint.y - panStartCanvas.y);
+      canvas.style.cursor = 'grabbing';
+      draw();
+      return;
+    }
+
+    const p = toPhysical(canvasPoint.x, canvasPoint.y);
+    previewPoint = p;
+
+    if (
+      draggingHandle &&
+      selectedCut >= 0 &&
+      dragOriginal
+    ) {
+      const dx = p.x - dragStart.x;
+      const dy = p.y - dragStart.y;
+
+      const a = dragOriginal.a;
+      const b = dragOriginal.b;
+
+      const vx = b.x - a.x;
+      const vy = b.y - a.y;
+      const len = Math.hypot(vx, vy);
+
+      if (len < 1e-12) return;
+
+      const nx = -vy / len;
+      const ny = vx / len;
+
+      // Dragging the handle moves the line only perpendicular to itself.
+      const amount = dx * nx + dy * ny;
+
+      if (
+        !dragHistoryRecorded &&
+        dragUndoSnapshot &&
+        Math.abs(amount) > 1e-7
+      ) {
+        pushSnapshot(dragUndoSnapshot);
+        dragHistoryRecorded = true;
+      }
+
+      cuts[selectedCut].a = {
+        x: a.x + nx * amount,
+        y: a.y + ny * amount
+      };
+
+      cuts[selectedCut].b = {
+        x: b.x + nx * amount,
+        y: b.y + ny * amount
+      };
+
+      canvas.style.cursor = 'grabbing';
+      draw();
+      return;
+    }
+
+    hoveredHandle = findHandleCanvas(canvasPoint);
+    hoveredLine =
+      hoveredHandle >= 0
+        ? hoveredHandle
+        : findLineCanvas(canvasPoint);
+    hoveredArea =
+      hoveredHandle >= 0 || hoveredLine >= 0
+        ? -1
+        : findAreaPhysical(p);
+
+    if (hoveredHandle >= 0) {
+      canvas.style.cursor = 'grab';
+      showMeasurePopover(hoveredHandle);
+    } else if (hoveredLine >= 0) {
+      canvas.style.cursor = 'pointer';
+      showMeasurePopover(hoveredLine);
+    } else if (hoveredArea >= 0) {
+      canvas.style.cursor = 'pointer';
+      showMeasurePopover(hoveredArea);
+    } else {
+      canvas.style.cursor = 'crosshair';
+      hideMeasurePopover();
+    }
+
+    if (drawStage === 'secondPoint') {
+      draw();
+    } else if (
+      hoveredHandle >= 0 ||
+      hoveredLine >= 0 ||
+      hoveredArea >= 0 ||
+      selectedCut >= 0
+    ) {
+      draw();
+    }
+  });
+
+  canvas.addEventListener('pointerleave', () => {
+    if (!draggingHandle) {
+      hoveredHandle = -1;
+      hoveredLine = -1;
+      hoveredArea = -1;
+      previewPoint = null;
+      canvas.style.cursor = 'crosshair';
+      hideMeasurePopover(120);
+      draw();
+    }
+  });
+
+  canvas.addEventListener('pointerdown', evt => {
+    const canvasPoint = pointerCanvas(evt);
+
+    if (spaceHeld || evt.shiftKey || evt.button === 1) {
+      evt.preventDefault();
+      isPanning = true;
+      panStartCanvas = canvasPoint;
+      panStartX = viewPanX;
+      panStartY = viewPanY;
+      hideMeasurePopover(0);
+      canvas.setPointerCapture(evt.pointerId);
+      canvas.style.cursor = 'grabbing';
+      return;
+    }
+
+    const p = toPhysical(canvasPoint.x, canvasPoint.y);
+
+    // Handle drag always wins. This test is direct screen-pixel vs screen-pixel.
+    const handleIndex = findHandleCanvas(canvasPoint);
+
+    if (handleIndex >= 0) {
+      selectedCut = handleIndex;
+      dragUndoSnapshot = snapshotState();
+      dragHistoryRecorded = false;
+      draggingHandle = true;
+      dragStart = p;
+      dragOriginal = {
+        a: { ...cuts[handleIndex].a },
+        b: { ...cuts[handleIndex].b }
+      };
+
+      drawStage = 'idle';
+      firstPoint = null;
+      pendingLine = null;
+
+      canvas.setPointerCapture(evt.pointerId);
+      canvas.style.cursor = 'grabbing';
+
+      statusEl.textContent = `Moving cut ${handleIndex + 1}:`;
+      instructionEl.textContent =
+        ' drag the handle perpendicular to the cut. Measurements and current dosage update live.';
+
+      draw();
+      return;
+    }
+
+    // Clicking an existing line selects it without entering a second mode.
+    const lineIndex = findLineCanvas(canvasPoint);
+
+    if (lineIndex >= 0) {
+      selectedCut = lineIndex;
+      drawStage = 'idle';
+      firstPoint = null;
+      pendingLine = null;
+
+      statusEl.textContent = `Cut ${lineIndex + 1} selected:`;
+      instructionEl.textContent =
+        ' drag its colored circular handle to move it, or click empty space to start a new cut.';
+
+      draw();
+      return;
+    }
+
+    const areaIndex = findAreaPhysical(p);
+
+    if (areaIndex >= 0) {
+      selectedCut = areaIndex;
+      drawStage = 'idle';
+      firstPoint = null;
+      pendingLine = null;
+
+      statusEl.textContent = `Area ${areaIndex + 1} selected:`;
+      instructionEl.textContent =
+        ' edit its measurements on the right, or drag its numbered cut handle.';
+
+      draw();
+      return;
+    }
+
+    // Empty-space click handles drawing a new cut.
+    if (drawStage === 'idle') {
+      firstPoint = p;
+      drawStage = 'secondPoint';
+
+      statusEl.textContent = 'New cut:';
+      instructionEl.textContent =
+        ' click a second point. Near-horizontal and near-vertical cuts snap magnetically.';
+
+      draw();
+      return;
+    }
+
+    if (drawStage === 'secondPoint') {
+      const q = snapSecondPoint(firstPoint, p);
+
+      if (
+        Math.hypot(
+          q.x - firstPoint.x,
+          q.y - firstPoint.y
+        ) < diameter() * .01
+      ) {
+        return;
+      }
+
+      pendingLine = {
+        a: { ...firstPoint },
+        b: { ...q }
+      };
+
+      firstPoint = null;
+      drawStage = 'chooseSide';
+
+      statusEl.textContent = 'Choose removed side:';
+      instructionEl.textContent =
+        ' click anywhere on the side of the dashed line you want removed.';
+
+      draw();
+      return;
+    }
+
+    if (drawStage === 'chooseSide' && pendingLine) {
+      const c = cross(pendingLine.a, pendingLine.b, p);
+
+      if (Math.abs(c) < 1e-9) return;
+
+      const removeSign = c > 0 ? 1 : -1;
+
+      const before = remainingPolygon();
+      const hits =
+        linePolygonIntersections(
+          pendingLine.a,
+          pendingLine.b,
+          before
+        );
+
+      if (hits.length < 2) {
+        drawStage = 'idle';
+        pendingLine = null;
+
+        statusEl.textContent = 'Cut misses the current piece:';
+        instructionEl.textContent =
+          ' click empty space to start another cut.';
+
+        draw();
+        return;
+      }
+
+      addCut(
+        pendingLine.a,
+        pendingLine.b,
+        removeSign
+      );
+
+      drawStage = 'idle';
+      pendingLine = null;
+
+      statusEl.textContent = `Cut ${selectedCut + 1} added:`;
+      instructionEl.textContent =
+        ' its colored handle is already active — drag it whenever you want to adjust the cut.';
+
+      draw();
+    }
+  });
+
+  canvas.addEventListener('pointerup', evt => {
+    if (isPanning) {
+      isPanning = false;
+      panStartCanvas = null;
+
+      try {
+        canvas.releasePointerCapture(evt.pointerId);
+      } catch {}
+
+      canvas.style.cursor = spaceHeld ? 'grab' : 'crosshair';
+      draw();
+      return;
+    }
+
+    if (!draggingHandle) return;
+
+    draggingHandle = false;
+    dragStart = null;
+    dragOriginal = null;
+    dragUndoSnapshot = null;
+    dragHistoryRecorded = false;
+
+    try {
+      canvas.releasePointerCapture(evt.pointerId);
+    } catch {}
+
+    canvas.style.cursor = 'grab';
+
+    statusEl.textContent = `Cut ${selectedCut + 1} adjusted:`;
+    instructionEl.textContent =
+      ' measurements are shown on the right. Click empty space to draw another cut.';
+
+    draw();
+  });
+
+  canvas.addEventListener('pointercancel', () => {
+    isPanning = false;
+    panStartCanvas = null;
+    draggingHandle = false;
+    dragStart = null;
+    dragOriginal = null;
+    draw();
+  });
+
+
+  canvas.addEventListener('wheel', evt => {
+    evt.preventDefault();
+
+    const canvasPoint = pointerCanvas(evt);
+    const before = toPhysical(canvasPoint.x, canvasPoint.y);
+
+    const oldZoom = viewZoom;
+    const factor = Math.exp(-evt.deltaY * 0.0012);
+    viewZoom = Math.max(0.35, Math.min(5, viewZoom * factor));
+
+    if (Math.abs(viewZoom - oldZoom) < 1e-9) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const size = Math.min(rect.width, rect.height);
+    const pad = Math.max(30, size * .075);
+    const baseRPx = (size - pad * 2) / 2;
+    const newScale = (baseRPx / radius()) * viewZoom;
+
+    viewPanX =
+      canvasPoint.x -
+      rect.width / 2 -
+      before.x * newScale;
+
+    viewPanY =
+      canvasPoint.y -
+      rect.height / 2 -
+      before.y * newScale;
+
+    draw();
+  }, { passive: false });
+
+  $('fitBtn').addEventListener('click', fitPatch);
+
+  $('undoBtn').addEventListener('click', undoLastOperation);
+
+
+  $('resetBtn').addEventListener('click', () => {
+    pushSnapshot();
+    cuts = [];
+    nextColor = 0;
+    selectedCut = -1;
+    drawStage = 'idle';
+    firstPoint = null;
+    pendingLine = null;
+
+    viewZoom = 1;
+    viewPanX = 0;
+    viewPanY = 0;
+    setReadyMessage();
+    draw();
+  });
+
+  [
+    diameterInput,
+    patchAreaInput,
+    fullDoseInput
+  ].forEach(input => {
+    input.addEventListener('focus', beginFieldHistory);
+    input.addEventListener('blur', endFieldHistory);
+  });
+
+  diameterInput.addEventListener('input', () => {
+    recordFieldHistoryOnce();
+    syncPatchAreaFromDiameter();
+    fitPatch();
+  });
+
+  patchAreaInput.addEventListener('input', () => {
+    recordFieldHistoryOnce();
+    syncDiameterFromPatchArea();
+    fitPatch();
+  });
+
+  fullDoseInput.addEventListener('input', () => {
+    recordFieldHistoryOnce();
+    draw();
+  });
+
+  snapToggle.addEventListener('change', () => {
+    pushSnapshot({
+      ...snapshotState(),
+      snapChecked: !snapToggle.checked
+    });
+    draw();
+  });
+
+  [
+    linkedStartInput,
+    linkedDirectionInput
+  ].forEach(input => {
+    input.addEventListener('change', draw);
+  });
+
+  linkedLengthInput.addEventListener('input', () => {
+    linkedMeasurementSource = 'length';
+    draw();
+  });
+
+  linkedDoseInput.addEventListener('input', () => {
+    linkedMeasurementSource = 'dose';
+    draw();
+  });
+
+  [linkedLengthInput, linkedDoseInput].forEach(input => {
+    input.addEventListener('keydown', evt => {
+      if (evt.key === 'Enter' && !linkedAddBtn.disabled) {
+        evt.preventDefault();
+        addMeasuredEndpointCut();
+      }
+    });
+  });
+  linkedAddBtn.addEventListener('click', addMeasuredEndpointCut);
+  linkedRoundBtn.addEventListener('click', roundMeasuredCutLength);
+
+  window.addEventListener('keydown', evt => {
+    const activeTag = document.activeElement?.tagName;
+    const editing =
+      activeTag === 'INPUT' ||
+      activeTag === 'TEXTAREA' ||
+      document.activeElement?.isContentEditable;
+
+    if (evt.code === 'Space' && !editing) {
+      evt.preventDefault();
+      spaceHeld = true;
+      if (!draggingHandle && !isPanning) {
+        canvas.style.cursor = 'grab';
+      }
+    }
+
+    if (
+      (evt.key === 'Delete' || evt.key === 'Backspace') &&
+      !editing &&
+      selectedCut >= 0
+    ) {
+      evt.preventDefault();
+
+      pushSnapshot();
+      cuts = cuts.filter((_, cutIndex) => cutIndex !== selectedCut);
+      selectedCut = -1;
+
+      draw();
+    }
+
+    if (evt.key === 'Escape') {
+      drawStage = 'idle';
+      firstPoint = null;
+      pendingLine = null;
+      setReadyMessage();
+      draw();
+    }
+  });
+
+  function resizeCanvas() {
+    // Match the backing store to the canvas's actual CSS box.
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+
+    canvas.width = Math.round(rect.width * dpr);
+    canvas.height = Math.round(rect.height * dpr);
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    draw();
+  }
+
+
+
+
+  function commitMeasurement(index, input, kind) {
+    if (index < 0 || index >= cuts.length) return;
+
+    if (input.value.trim() === '') {
+      draw();
+      return;
+    }
+
+    const value = Number(input.value);
+    if (!Number.isFinite(value)) return;
+
+    const before = snapshotState();
+    let ok = false;
+
+    if (kind === 'dose') {
+      ok = adjustCutToDose(index, value);
+    } else if (kind === 'area') {
+      ok = adjustCutToArea(index, value);
+    } else if (kind === 'length') {
+      ok = adjustCutToLength(index, value);
+    }
+
+    if (ok) {
+      pushSnapshot(before);
+      updateSidebar();
+      input.select();
+    }
+  }
+
+  function commitSideMeasurement(input, kind) {
+    commitMeasurement(selectedCut, input, kind);
+  }
+
+  [
+    [sideCurrentDoseInput, 'dose'],
+    [sideCurrentAreaInput, 'area'],
+    [sideCutLengthInput, 'length']
+  ].forEach(([input, kind]) => {
+    input.addEventListener('keydown', evt => {
+      if (evt.key === 'Enter') {
+        evt.preventDefault();
+        commitSideMeasurement(input, kind);
+      }
+
+      if (evt.key === 'Escape') {
+        input.blur();
+      }
+    });
+
+    input.addEventListener('change', () => {
+      commitSideMeasurement(input, kind);
+    });
+  });
+
+  window.addEventListener('keyup', evt => {
+    if (evt.code === 'Space') {
+      spaceHeld = false;
+      if (!isPanning && !draggingHandle) {
+        canvas.style.cursor = 'crosshair';
+      }
+    }
+  });
+
+  measurePopover.addEventListener('pointerenter', () => {
+    clearTimeout(popoverHideTimer);
+    popoverPinned = true;
+  });
+
+  measurePopover.addEventListener('pointerleave', () => {
+    const active = document.activeElement;
+    if (
+      active === hoverCurrentDoseInput ||
+      active === hoverCurrentAreaInput ||
+      active === hoverCutLengthInput
+    ) {
+      return;
+    }
+
+    popoverPinned = false;
+    hideMeasurePopover(100);
+  });
+
+  function pinPopoverInput() {
+    popoverPinned = true;
+  }
+
+  function releasePopoverInput() {
+    popoverPinned = false;
+    hideMeasurePopover(180);
+  }
+
+  [
+    hoverCurrentDoseInput,
+    hoverCurrentAreaInput,
+    hoverCutLengthInput
+  ].forEach(input => {
+    input.addEventListener('focus', pinPopoverInput);
+    input.addEventListener('blur', releasePopoverInput);
+  });
+
+  function commitPopoverMeasurement(input, kind) {
+    if (popoverCut < 0 || popoverCut >= cuts.length) return;
+    selectedCut = popoverCut;
+    commitMeasurement(popoverCut, input, kind);
+  }
+
+  [
+    [hoverCurrentDoseInput, 'dose'],
+    [hoverCurrentAreaInput, 'area'],
+    [hoverCutLengthInput, 'length']
+  ].forEach(([input, kind]) => {
+    input.addEventListener('keydown', evt => {
+      if (evt.key === 'Enter') {
+        evt.preventDefault();
+        commitPopoverMeasurement(input, kind);
+      }
+
+      if (evt.key === 'Escape') {
+        input.blur();
+      }
+    });
+
+    input.addEventListener('change', () => {
+      commitPopoverMeasurement(input, kind);
+    });
+  });
+
+
+  document.querySelector('.app').addEventListener('contextmenu', evt => {
+    evt.preventDefault();
+    undoLastOperation();
+  });
+
+  window.addEventListener('resize', resizeCanvas);
+
+  syncPatchAreaFromDiameter();
+  resizeCanvas();
+})();
+</script>
+</body>
+</html>
