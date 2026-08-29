@@ -25,6 +25,7 @@
 
   const SNAP_DEGREES = 8;
   const HANDLE_RADIUS_PX = 11;
+  const HANDLE_RING_RADIUS_PX = HANDLE_RADIUS_PX + 4;
   const HANDLE_HIT_PX = 30;
   const MEASURED_ENDPOINT_HIT_PX = 22;
   const LINE_HIT_PX = 10;
@@ -278,20 +279,38 @@
     const end = toCanvas(segment.value.b, view);
     const selected = index === calculator.selectedCut;
     const hovered = index === hoveredLine || index === hoveredHandle || index === hoveredArea;
+    const lineWidth = cutLineWidth(selected, hovered);
+    const handle = handlePoint(index);
+    const screen = handle ? toCanvas(handle, view) : undefined;
 
     context.save();
     context.beginPath();
-    context.moveTo(start.x, start.y);
-    context.lineTo(end.x, end.y);
-    context.lineWidth = cutLineWidth(selected, hovered);
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const length = Math.hypot(dx, dy);
+    if (screen && length > 0) {
+      const gapRadius = HANDLE_RING_RADIUS_PX + lineWidth / 2;
+      const ux = dx / length;
+      const uy = dy / length;
+      if (Math.hypot(screen.x - start.x, screen.y - start.y) > gapRadius) {
+        context.moveTo(start.x, start.y);
+        context.lineTo(screen.x - ux * gapRadius, screen.y - uy * gapRadius);
+      }
+      if (Math.hypot(end.x - screen.x, end.y - screen.y) > gapRadius) {
+        context.moveTo(screen.x + ux * gapRadius, screen.y + uy * gapRadius);
+        context.lineTo(end.x, end.y);
+      }
+    } else {
+      context.moveTo(start.x, start.y);
+      context.lineTo(end.x, end.y);
+    }
+    context.lineWidth = lineWidth;
     context.lineCap = "round";
     context.strokeStyle = cut.color;
     context.stroke();
     context.restore();
 
-    const handle = handlePoint(index);
-    if (!handle) return;
-    const screen = toCanvas(handle, view);
+    if (!screen) return;
     context.save();
     context.beginPath();
     context.arc(screen.x, screen.y, HANDLE_RADIUS_PX, 0, Math.PI * 2);
@@ -302,7 +321,7 @@
     context.stroke();
     if (index === hoveredHandle || selected) {
       context.beginPath();
-      context.arc(screen.x, screen.y, index === hoveredHandle ? HANDLE_HIT_PX : HANDLE_RADIUS_PX + 4, 0, Math.PI * 2);
+      context.arc(screen.x, screen.y, index === hoveredHandle ? HANDLE_HIT_PX : HANDLE_RING_RADIUS_PX, 0, Math.PI * 2);
       context.lineWidth = 2;
       context.strokeStyle = cut.color;
       context.globalAlpha = index === hoveredHandle ? 0.35 : 1;
