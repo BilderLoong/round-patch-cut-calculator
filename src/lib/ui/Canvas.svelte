@@ -394,10 +394,18 @@
   const scale = (point: Point, amount: number): Point => ({ x: point.x * amount, y: point.y * amount });
 
   const drawSelectedMeasurements = (context: CanvasRenderingContext2D, view: CanvasView): void => {
-    const cut = calculator.cuts[calculator.selectedCut];
+    const selectedIndex = calculator.selectedCut;
+    if (selectedIndex < 0) return;
+    const isActive =
+      hoveredHandle === selectedIndex ||
+      hoveredLine === selectedIndex ||
+      (draggingHandle && dragIndex === selectedIndex);
+    if (!isActive) return;
+
+    const cut = calculator.cuts[selectedIndex];
     if (!cut) return;
     const normal = lineNormal(cut);
-    const segment = cutSegmentThroughPiece(cut, calculator.cuts.slice(0, calculator.selectedCut), calculator.settings.diameter / 2);
+    const segment = cutSegmentThroughPiece(cut, calculator.cuts.slice(0, selectedIndex), calculator.settings.diameter / 2);
     if (!normal || segment.kind === "none") return;
 
     const keptDirection = cut.removeSign > 0 ? scale(normal, -1) : normal;
@@ -411,8 +419,8 @@
     const foot = projectPointToLine(rimPoint, cut);
     drawDimension(context, foot, rimPoint, `Rim ${Math.hypot(rimPoint.x - foot.x, rimPoint.y - foot.y).toFixed(2)} cm`, view, cut.color);
 
-    const previous = calculator.cuts[calculator.selectedCut - 1];
-    const handle = handlePoint(calculator.selectedCut);
+    const previous = calculator.cuts[selectedIndex - 1];
+    const handle = handlePoint(selectedIndex);
     if (!previous || !handle) return;
     const projection = projectPointToLine(handle, previous);
     const angle = angleDifferenceDeg(cut, previous);
