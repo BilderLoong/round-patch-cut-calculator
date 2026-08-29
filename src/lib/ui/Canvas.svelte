@@ -500,8 +500,8 @@
     const view = currentView();
     context.clearRect(0, 0, view.width, view.height);
     drawRemainingShape(context, view);
-    calculator.cuts.forEach((_, index) => drawCut(context, index, view));
     drawSelectedMeasurements(context, view);
+    calculator.cuts.forEach((_, index) => drawCut(context, index, view));
     drawMeasuredGuides(context, view);
 
     if (drawStage === "secondPoint" && firstPoint && previewPoint) {
