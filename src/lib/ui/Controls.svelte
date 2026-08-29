@@ -11,34 +11,64 @@
 
   let { settings, onSettingsChange, onFit, onUndo, onReset }: Props = $props();
 
-  const numberFromEvent = (event: Event): number => {
+  let diameterDraft = $state("");
+  let patchAreaDraft = $state("");
+  let fullDoseDraft = $state("");
+
+  $effect(() => {
+    diameterDraft = String(settings.diameter);
+    patchAreaDraft = String(settings.patchArea);
+    fullDoseDraft = String(settings.fullDose);
+  });
+
+  const valueFromEvent = (event: Event): string => {
     const input = event.currentTarget;
-    return input instanceof HTMLInputElement ? Number(input.value) : Number.NaN;
+    return input instanceof HTMLInputElement ? input.value : "";
   };
 
-  const updateDiameter = (event: Event): void => {
-    const diameter = numberFromEvent(event);
-    if (Number.isFinite(diameter) && diameter > 0) {
-      onSettingsChange({
-        diameter,
-        patchArea: Math.PI * (diameter / 2) ** 2,
-      });
+  const updateDiameterDraft = (event: Event): void => {
+    diameterDraft = valueFromEvent(event);
+  };
+
+  const commitDiameter = (event: Event): void => {
+    const diameter = Number(valueFromEvent(event));
+    if (!Number.isFinite(diameter) || diameter <= 0) {
+      diameterDraft = String(settings.diameter);
+      return;
     }
+    onSettingsChange({
+      diameter,
+      patchArea: Math.PI * (diameter / 2) ** 2,
+    });
   };
 
-  const updatePatchArea = (event: Event): void => {
-    const patchArea = numberFromEvent(event);
-    if (Number.isFinite(patchArea) && patchArea > 0) {
-      onSettingsChange({
-        patchArea,
-        diameter: 2 * Math.sqrt(patchArea / Math.PI),
-      });
+  const updatePatchAreaDraft = (event: Event): void => {
+    patchAreaDraft = valueFromEvent(event);
+  };
+
+  const commitPatchArea = (event: Event): void => {
+    const patchArea = Number(valueFromEvent(event));
+    if (!Number.isFinite(patchArea) || patchArea <= 0) {
+      patchAreaDraft = String(settings.patchArea);
+      return;
     }
+    onSettingsChange({
+      patchArea,
+      diameter: 2 * Math.sqrt(patchArea / Math.PI),
+    });
   };
 
-  const updateFullDose = (event: Event): void => {
-    const fullDose = numberFromEvent(event);
-    if (Number.isFinite(fullDose) && fullDose > 0) onSettingsChange({ fullDose });
+  const updateFullDoseDraft = (event: Event): void => {
+    fullDoseDraft = valueFromEvent(event);
+  };
+
+  const commitFullDose = (event: Event): void => {
+    const fullDose = Number(valueFromEvent(event));
+    if (!Number.isFinite(fullDose) || fullDose <= 0) {
+      fullDoseDraft = String(settings.fullDose);
+      return;
+    }
+    onSettingsChange({ fullDose });
   };
 
   const updateSnap = (event: Event): void => {
@@ -47,7 +77,7 @@
   };
 </script>
 
-<div class="grid gap-3 md:grid-cols-3">
+<div class="grid gap-3 @min-[620px]:grid-cols-3">
   <label class="grid gap-2 text-sm font-semibold text-stone-700">
     <span>Patch diameter (cm)</span>
     <input
@@ -55,8 +85,9 @@
       type="number"
       min="0.1"
       step="0.01"
-      value={settings.diameter}
-      oninput={updateDiameter}
+      value={diameterDraft}
+      oninput={updateDiameterDraft}
+      onchange={commitDiameter}
       aria-label="Patch diameter in centimetres"
     />
   </label>
@@ -68,8 +99,9 @@
       type="number"
       min="0.01"
       step="0.01"
-      value={settings.patchArea}
-      oninput={updatePatchArea}
+      value={patchAreaDraft}
+      oninput={updatePatchAreaDraft}
+      onchange={commitPatchArea}
       aria-label="Patch total area in square centimetres"
     />
   </label>
@@ -81,8 +113,9 @@
       type="number"
       min="0.001"
       step="0.1"
-      value={settings.fullDose}
-      oninput={updateFullDose}
+      value={fullDoseDraft}
+      oninput={updateFullDoseDraft}
+      onchange={commitFullDose}
       aria-label="Full patch labeled dosage in milligrams"
     />
   </label>

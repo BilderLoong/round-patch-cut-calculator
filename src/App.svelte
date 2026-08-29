@@ -27,6 +27,7 @@
     MeasurementAdjustmentResult,
     MeasurementSource,
     MeasuredInputs,
+    StartChoice,
     ViewState,
   } from "./lib/calculator/types";
   import { isFormEditingTag } from "./lib/ui/keyboard";
@@ -76,17 +77,15 @@
   const updateMeasuredInputs = (changes: Partial<MeasuredInputs>): void => {
     const next: MeasuredInputs = { ...measured, ...changes };
     const source: MeasurementSource = changes.source ?? next.source;
-    const nextWithSource = { ...next, source };
-    const nextPreview = measuredCutPreview(calculator.cuts, radius, calculator.settings.fullDose, nextWithSource);
-    if (source === "length" && changes.length !== undefined && nextPreview.ok) {
-      measured = { ...nextWithSource, dose: nextPreview.dosage.toFixed(3) };
+    if (source === "length" && changes.length !== undefined) {
+      measured = { ...next, source, dose: "" };
       return;
     }
-    if (source === "dose" && changes.dose !== undefined && nextPreview.ok) {
-      measured = { ...nextWithSource, length: nextPreview.length.toFixed(3) };
+    if (source === "dose" && changes.dose !== undefined) {
+      measured = { ...next, source, length: "" };
       return;
     }
-    measured = nextWithSource;
+    measured = { ...next, source };
   };
 
   const setCanvasInteractionPending = (pending: boolean): void => {
@@ -124,7 +123,7 @@
   };
 
   const roundMeasuredLength = (): void => {
-    const length = Number(measured.length);
+    const length = measured.source === "dose" && preview.ok ? preview.length : Number(measured.length);
     if (!Number.isFinite(length) || length <= 0) return;
     const rounded = (Math.round(length * 10) / 10).toFixed(1);
     updateMeasuredInputs({ length: rounded, source: "length" });
@@ -159,6 +158,14 @@
   const selectCut = (index: number): void => {
     updateCurrent(setSelectedCut(calculator, index));
     patchStatus(`Cut ${index + 1} selected:`, " drag its colored circular handle to move it, or click empty space to start a new cut.");
+  };
+
+  const selectMeasuredStart = (start: StartChoice): void => {
+    updateMeasuredInputs({ start });
+    patchStatus(
+      start === "a" ? "End A selected:" : "End B selected:",
+      " enter a length or dosage for the next measured cut.",
+    );
   };
 
   const addManualCut = (cut: GeometryCut): void => {
@@ -260,10 +267,15 @@
       </p>
     </header>
 
-    <div class="grid items-start gap-4 lg:grid-cols-[minmax(0,1.45fr)_minmax(330px,.55fr)]">
+    <div class="grid items-start gap-4 min-[900px]:grid-cols-[minmax(0,1.35fr)_minmax(300px,.65fr)]">
       <main class="rounded-2xl bg-white p-4 shadow-[0_2px_6px_rgb(0_0_0_/0.06),0_16px_40px_rgb(0_0_0_/0.07)] ring-1 ring-stone-200 sm:p-5">
-        <Controls settings={calculator.settings} onSettingsChange={updateSettings} onFit={fitPatch} onUndo={undo} onReset={reset} />
+        <div class="@container">
+          <Controls settings={calculator.settings} onSettingsChange={updateSettings} onFit={fitPatch} onUndo={undo} onReset={reset} />
+        </div>
         <MeasuredPanel hasCuts={calculator.cuts.length > 0} inputs={measured} preview={preview} onInputsChange={updateMeasuredInputs} onAdd={addMeasuredCut} onRound={roundMeasuredLength} />
+        <div class="mt-4 min-h-11 rounded-xl bg-stone-100 p-3 text-sm leading-6 text-stone-600 [text-wrap:pretty]" role="status" aria-live="polite" aria-atomic="true">
+          <span class="font-extrabold text-stone-900">{status}</span>{instruction}
+        </div>
         <div class="mt-4">
           <Canvas
             calculator={calculator}
@@ -280,10 +292,8 @@
             onInteractionStateChange={setCanvasInteractionPending}
             onViewChange={changeView}
             onMessage={patchStatus}
+            onMeasuredStartChange={selectMeasuredStart}
           />
-        </div>
-        <div class="mt-3 min-h-11 rounded-xl bg-stone-100 p-3 text-sm leading-6 text-stone-600 [text-wrap:pretty]" role="status" aria-live="polite" aria-atomic="true">
-          <span class="font-extrabold text-stone-900">{status}</span>{instruction}
         </div>
       </main>
 

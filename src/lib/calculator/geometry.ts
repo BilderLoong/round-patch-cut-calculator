@@ -17,6 +17,8 @@ import { none, some } from "./types";
 export const CIRCLE_SEGMENTS = 2048;
 export const PARALLEL_TOLERANCE_DEG = 1;
 const MINIMUM_AREA_RATIO = 1e-6;
+const TWO_PI = Math.PI * 2;
+const ANGLE_EPSILON = 1e-9;
 
 const closeEnough = (a: number, b: number, tolerance: number): boolean =>
   Math.abs(a - b) <= tolerance;
@@ -379,7 +381,22 @@ interface ConnectedCandidateOptions {
   readonly fullDose: number;
 }
 
-export const buildMeasuredCutCandidate = ({
+const endpointAtCentralAngle = (
+  start: Point,
+  radius: number,
+  direction: Direction,
+  centralAngle: number,
+): Point => {
+  const startAngle = Math.atan2(start.y, start.x);
+  const directionSign = direction === "clockwise" ? 1 : -1;
+  const endAngle = startAngle + directionSign * centralAngle;
+  return { x: Math.cos(endAngle) * radius, y: Math.sin(endAngle) * radius };
+};
+
+const lengthAtCentralAngle = (radius: number, centralAngle: number): number =>
+  radius * 2 * Math.sin(centralAngle / 2);
+
+const buildMeasuredCutCandidateGeometry = ({
   previousSegment,
   previousCuts,
   currentPiece,
@@ -403,11 +420,8 @@ export const buildMeasuredCutCandidate = ({
 
   const start = startChoice === "a" ? previousSegment.a : previousSegment.b;
   const otherEnd = startChoice === "a" ? previousSegment.b : previousSegment.a;
-  const startAngle = Math.atan2(start.y, start.x);
   const centralAngle = 2 * Math.asin(Math.min(1, length / diameter));
-  const directionSign = direction === "clockwise" ? 1 : -1;
-  const endAngle = startAngle + directionSign * centralAngle;
-  const end = { x: Math.cos(endAngle) * radius, y: Math.sin(endAngle) * radius };
+  const end = endpointAtCentralAngle(start, radius, direction, centralAngle);
   const side = cross(start, end, otherEnd);
 
   if (Math.abs(side) < 1e-9) {
@@ -435,12 +449,6 @@ export const buildMeasuredCutCandidate = ({
   const removedArea = polygonArea(
     clipPolygon(currentPiece, { ...cut, removeSign: cut.removeSign === 1 ? -1 : 1 }),
   );
-  if (removedArea <= circleArea(radius) * MINIMUM_AREA_RATIO) {
-    return {
-      ok: false,
-      message: "This cut does not create a new area. Change the length, endpoint, or direction.",
-    };
-  }
 
   const lineAngle = (Math.atan2(end.y - start.y, end.x - start.x) * 180) / Math.PI;
   const dosage = circleArea(radius) > 0 ? (fullDose * removedArea) / circleArea(radius) : 0;
@@ -458,9 +466,146 @@ export const buildMeasuredCutCandidate = ({
   };
 };
 
+export const buildMeasuredCutCandidate = (
+  options: ConnectedCandidateOptions & { readonly length: number },
+): CandidateResult => {
+  const candidate = buildMeasuredCutCandidateGeometry(options);
+  if (!candidate.ok) return candidate;
+  if (candidate.removedArea <= circleArea(options.radius) * MINIMUM_AREA_RATIO) {
+    return {
+      ok: false,
+      message: "This cut does not create a new area. Change the length, endpoint, or direction.",
+    };
+  }
+  return candidate;
+};
+
 const isCandidateSuccess = (
   candidate: CandidateResult,
 ): candidate is CandidateSuccess => candidate.ok;
+
+const isMeaningfulCandidateSuccess = (
+  candidate: CandidateResult,
+  radius: number,
+): candidate is CandidateSuccess =>
+  candidate.ok && candidate.removedArea > circleArea(radius) * MINIMUM_AREA_RATIO;
+
+const normalizeAngle = (angle: number): number => {
+  const normalized = angle % TWO_PI;
+  return normalized < 0 ? normalized + TWO_PI : normalized;
+};
+
+const directedCentralAngle = (
+  startAngle: number,
+  pointAngle: number,
+  direction: Direction,
+): number => normalizeAngle(
+  direction === "clockwise" ? pointAngle - startAngle : startAngle - pointAngle,
+);
+
+const exactCircleLineIntersections = (
+  start: Point,
+  end: Point,
+  radius: number,
+): readonly Point[] => {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const lengthSquared = dx * dx + dy * dy;
+  if (lengthSquared < 1e-12) return [];
+
+  const projection = -((start.x * dx + start.y * dy) / lengthSquared);
+  const foot = {
+    x: start.x + projection * dx,
+    y: start.y + projection * dy,
+  };
+  const offsetSquared = radius * radius - foot.x * foot.x - foot.y * foot.y;
+  if (offsetSquared < -1e-10) return [];
+  if (offsetSquared <= 1e-10) return [foot];
+
+  const offset = Math.sqrt(offsetSquared / lengthSquared);
+  return [
+    { x: foot.x + dx * offset, y: foot.y + dy * offset },
+    { x: foot.x - dx * offset, y: foot.y - dy * offset },
+  ];
+};
+
+interface CentralAngleInterval {
+  readonly lower: number;
+  readonly upper: number;
+}
+
+const uniqueSortedAngles = (angles: readonly number[]): readonly number[] =>
+  angles.toSorted((a, b) => a - b).reduce<readonly number[]>((unique, angle) => {
+    const previous = unique.at(-1);
+    return previous !== undefined && Math.abs(previous - angle) <= ANGLE_EPSILON
+      ? unique
+      : [...unique, angle];
+  }, []);
+
+const endpointIsReachable = (
+  options: ConnectedCandidateOptions,
+  centralAngle: number,
+): boolean => {
+  const start = options.startChoice === "a"
+    ? options.previousSegment.a
+    : options.previousSegment.b;
+  const end = endpointAtCentralAngle(start, options.radius, options.direction, centralAngle);
+  return options.previousCuts.every((cut) => insideHalfPlane(end, cut));
+};
+
+const validCentralAngleIntervals = (
+  options: ConnectedCandidateOptions,
+): readonly CentralAngleInterval[] => {
+  const start = options.startChoice === "a"
+    ? options.previousSegment.a
+    : options.previousSegment.b;
+  const startAngle = Math.atan2(start.y, start.x);
+  const intersections = options.previousCuts.flatMap((cut) =>
+    exactCircleLineIntersections(cut.a, cut.b, options.radius).map((point) =>
+      directedCentralAngle(
+        startAngle,
+        Math.atan2(point.y, point.x),
+        options.direction,
+      ),
+    ),
+  );
+  const breakpoints = uniqueSortedAngles([
+    0,
+    Math.PI,
+    ...intersections
+      .filter((angle) => angle > ANGLE_EPSILON && angle < Math.PI - ANGLE_EPSILON),
+  ]);
+
+  return breakpoints.slice(1).flatMap((upper, index) => {
+    const lower = breakpoints[index];
+    if (lower === undefined || upper - lower <= ANGLE_EPSILON) return [];
+    return endpointIsReachable(options, (lower + upper) / 2)
+      ? [{ lower, upper }]
+      : [];
+  });
+};
+
+const buildCandidateAtCentralAngle = (
+  options: ConnectedCandidateOptions,
+  centralAngle: number,
+): CandidateResult => {
+  const length = lengthAtCentralAngle(options.radius, centralAngle);
+  return buildMeasuredCutCandidateGeometry({ ...options, length });
+};
+
+const buildCandidateAtIntervalBoundary = (
+  options: ConnectedCandidateOptions,
+  interval: CentralAngleInterval,
+  lowerBoundary: boolean,
+): CandidateResult => {
+  const boundary = lowerBoundary ? interval.lower : interval.upper;
+  const direct = buildCandidateAtCentralAngle(options, boundary);
+  if (direct.ok) return direct;
+
+  const nudge = Math.min((interval.upper - interval.lower) / 4, 1e-6);
+  const interior = lowerBoundary ? boundary + nudge : boundary - nudge;
+  return buildCandidateAtCentralAngle(options, interior);
+};
 
 const bisectMeasuredCutArea = (
   options: ConnectedCandidateOptions,
@@ -468,7 +613,7 @@ const bisectMeasuredCutArea = (
   lower: number,
   upper: number,
 ): CandidateResult => {
-  const initial = buildMeasuredCutCandidate({ ...options, length: lower });
+  const initial = buildMeasuredCutCandidateGeometry({ ...options, length: lower });
   if (!initial.ok) return initial;
 
   const bounds = Array.from({ length: 60 }).reduce<{
@@ -478,7 +623,7 @@ const bisectMeasuredCutArea = (
   }>(
     (state) => {
       const middle = (state.lower + state.upper) / 2;
-      const candidate = buildMeasuredCutCandidate({ ...options, length: middle });
+      const candidate = buildMeasuredCutCandidateGeometry({ ...options, length: middle });
       if (!candidate.ok) return state;
 
       const lowerDifference = state.lowerCandidate.removedArea - targetArea;
@@ -498,10 +643,54 @@ const bisectMeasuredCutArea = (
     { lower, upper, lowerCandidate: initial },
   );
 
-  return buildMeasuredCutCandidate({
+  return buildMeasuredCutCandidateGeometry({
     ...options,
     length: (bounds.lower + bounds.upper) / 2,
   });
+};
+
+const solveMeasuredCutInterval = (
+  options: ConnectedCandidateOptions,
+  targetArea: number,
+  interval: CentralAngleInterval,
+): Option<CandidateSuccess> => {
+  const lower = buildCandidateAtIntervalBoundary(options, interval, true);
+  const upper = buildCandidateAtIntervalBoundary(options, interval, false);
+  if (!lower.ok || !upper.ok) return none();
+
+  const lowerDifference = lower.removedArea - targetArea;
+  const upperDifference = upper.removedArea - targetArea;
+  const tolerance = Math.max(1e-5, targetArea * 0.00001);
+  const meaningful = [lower, upper].filter((candidate): candidate is CandidateSuccess =>
+    isMeaningfulCandidateSuccess(candidate, options.radius),
+  );
+  const best = meaningful.reduce<CandidateSuccess | undefined>((closest, candidate) => {
+    if (!closest) return candidate;
+    return Math.abs(candidate.removedArea - targetArea) < Math.abs(closest.removedArea - targetArea)
+      ? candidate
+      : closest;
+  }, undefined);
+
+  if (Math.abs(lowerDifference) <= 1e-9 && isMeaningfulCandidateSuccess(lower, options.radius)) {
+    return some(lower);
+  }
+  if (Math.abs(upperDifference) <= 1e-9 && isMeaningfulCandidateSuccess(upper, options.radius)) {
+    return some(upper);
+  }
+
+  if (lowerDifference * upperDifference <= 0) {
+    const root = bisectMeasuredCutArea(
+      options,
+      targetArea,
+      lower.length,
+      upper.length,
+    );
+    if (isMeaningfulCandidateSuccess(root, options.radius)) return some(root);
+  }
+
+  return best && Math.abs(best.removedArea - targetArea) <= tolerance
+    ? some(best)
+    : none();
 };
 
 const solveMeasuredCutForArea = (
@@ -509,52 +698,18 @@ const solveMeasuredCutForArea = (
   targetArea: number,
   preferredLength: number,
 ): CandidateResult => {
-  const diameter = options.radius * 2;
-  const samples = Array.from({ length: 720 }, (_, index) => {
-    const length = (diameter * (index + 1)) / 720;
-    return {
-      length,
-      candidate: buildMeasuredCutCandidate({ ...options, length }),
-    };
-  });
-  const validSamples = samples.filter(
-    (sample): sample is { readonly length: number; readonly candidate: CandidateSuccess } =>
-      isCandidateSuccess(sample.candidate),
-  );
-  const firstValid = validSamples.at(0);
-  if (!firstValid) {
+  const intervals = validCentralAngleIntervals(options);
+  if (!intervals.length) {
     return { ok: false, message: "No connected cut is available for this endpoint and direction." };
   }
 
-  const bestSample = validSamples.reduce(
-    (best, sample) => {
-      const error = Math.abs(sample.candidate.removedArea - targetArea);
-      return error < best.error ? { sample, error } : best;
-    },
-    {
-      sample: firstValid,
-      error: Math.abs(firstValid.candidate.removedArea - targetArea),
-    },
-  );
-
-  const brackets = samples.slice(1).flatMap((sample, index) => {
-    const previous = samples[index];
-    if (!previous || !previous.candidate.ok || !sample.candidate.ok) return [];
-
-    const previousDifference = previous.candidate.removedArea - targetArea;
-    const difference = sample.candidate.removedArea - targetArea;
-    return previousDifference * difference <= 0
-      ? [{ lower: previous.length, upper: sample.length }]
-      : [];
+  const roots = intervals.flatMap((interval) => {
+    const solution = solveMeasuredCutInterval(options, targetArea, interval);
+    return solution.kind === "some" ? [solution.value] : [];
   });
-
-  const roots = brackets.map((bracket) =>
-    bisectMeasuredCutArea(options, targetArea, bracket.lower, bracket.upper),
-  ).filter(isCandidateSuccess);
-
-  const closestRoot = roots.at(0);
-  if (closestRoot && !Number.isFinite(preferredLength)) return closestRoot;
-  if (closestRoot) {
+  const firstRoot = roots.at(0);
+  if (firstRoot && !Number.isFinite(preferredLength)) return firstRoot;
+  if (firstRoot) {
     return roots.reduce((closest, candidate) => {
       const candidateDistance = Math.abs(candidate.length - preferredLength);
       const closestDistance = Math.abs(closest.length - preferredLength);
@@ -562,10 +717,7 @@ const solveMeasuredCutForArea = (
     });
   }
 
-  const tolerance = Math.max(1e-5, targetArea * 0.00001);
-  return bestSample.error <= tolerance
-    ? bestSample.sample.candidate
-    : { ok: false, message: "This dosage is not reachable from the selected endpoint and direction." };
+  return { ok: false, message: "This dosage is not reachable from the selected endpoint and direction." };
 };
 
 const firstMeasuredCutPreview = (

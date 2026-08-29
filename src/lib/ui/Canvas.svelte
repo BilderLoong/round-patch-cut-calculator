@@ -26,6 +26,7 @@
   const SNAP_DEGREES = 8;
   const HANDLE_RADIUS_PX = 11;
   const HANDLE_HIT_PX = 30;
+  const MEASURED_ENDPOINT_HIT_PX = 22;
   const LINE_HIT_PX = 10;
   const PARALLEL_TOLERANCE = 1;
 
@@ -46,6 +47,7 @@
     readonly onInteractionStateChange: (pending: boolean) => void;
     readonly onViewChange: (view: ViewState) => void;
     readonly onMessage: (status: string, instruction: string) => void;
+    readonly onMeasuredStartChange: (start: StartChoice) => void;
   }
 
   let {
@@ -63,6 +65,7 @@
     onInteractionStateChange,
     onViewChange,
     onMessage,
+    onMeasuredStartChange,
   }: Props = $props();
 
   let canvas = $state<HTMLCanvasElement | null>(null);
@@ -74,6 +77,7 @@
   let hoveredHandle = $state(-1);
   let hoveredLine = $state(-1);
   let hoveredArea = $state(-1);
+  let hoveredMeasuredStart = $state<StartChoice | undefined>(undefined);
   let draggingHandle = $state(false);
   let dragIndex = $state(-1);
   let dragStart = $state<Point | undefined>(undefined);
@@ -180,6 +184,36 @@
       { index: -1, distance: Number.POSITIVE_INFINITY },
     );
     return best.distance <= LINE_HIT_PX ? best.index : -1;
+  };
+
+  interface MeasuredEndpoint {
+    readonly key: StartChoice;
+    readonly point: Point;
+  }
+
+  const measuredEndpoints = (): readonly MeasuredEndpoint[] => {
+    const last = calculator.cuts.at(-1);
+    if (!last) return [];
+    const segment = cutSegmentThroughCircle(last, calculator.settings.diameter / 2);
+    if (segment.kind === "none") return [];
+    return [
+      { key: "a", point: segment.value.a },
+      { key: "b", point: segment.value.b },
+    ];
+  };
+
+  const findMeasuredStart = (point: Point, view: CanvasView): StartChoice | undefined => {
+    const nearby = measuredEndpoints()
+      .map((endpoint) => ({
+        key: endpoint.key,
+        distance: Math.hypot(
+          point.x - toCanvas(endpoint.point, view).x,
+          point.y - toCanvas(endpoint.point, view).y,
+        ),
+      }))
+      .filter((endpoint) => endpoint.distance <= MEASURED_ENDPOINT_HIT_PX)
+      .toSorted((first, second) => first.distance - second.distance);
+    return nearby.at(0)?.key;
   };
 
   const fillPolygon = (
@@ -388,31 +422,34 @@
   const drawMeasuredGuides = (context: CanvasRenderingContext2D, view: CanvasView): void => {
     const last = calculator.cuts.at(-1);
     if (last) {
-      const segment = cutSegmentThroughCircle(last, calculator.settings.diameter / 2);
-      if (segment.kind === "some") {
-        const endpoints = [
-          { key: "a", label: "A", point: segment.value.a },
-          { key: "b", label: "B", point: segment.value.b },
-        ];
-        endpoints.forEach((endpoint) => {
-          const point = toCanvas(endpoint.point, view);
-          const selected = endpoint.key === measuredStart;
-          context.save();
+      measuredEndpoints().forEach((endpoint) => {
+        const point = toCanvas(endpoint.point, view);
+        const selected = endpoint.key === measuredStart;
+        const hovered = endpoint.key === hoveredMeasuredStart;
+        context.save();
+        if (hovered) {
           context.beginPath();
-          context.arc(point.x, point.y, selected ? 12 : 10, 0, Math.PI * 2);
-          context.fillStyle = selected ? last.color : "#ffffff";
-          context.fill();
-          context.lineWidth = selected ? 3 : 2;
+          context.arc(point.x, point.y, MEASURED_ENDPOINT_HIT_PX, 0, Math.PI * 2);
+          context.lineWidth = 2;
           context.strokeStyle = last.color;
+          context.globalAlpha = 0.35;
           context.stroke();
-          context.fillStyle = selected ? "#ffffff" : last.color;
-          context.font = "800 11px system-ui";
-          context.textAlign = "center";
-          context.textBaseline = "middle";
-          context.fillText(endpoint.label, point.x, point.y + 0.5);
-          context.restore();
-        });
-      }
+          context.globalAlpha = 1;
+        }
+        context.beginPath();
+        context.arc(point.x, point.y, selected || hovered ? 12 : 10, 0, Math.PI * 2);
+        context.fillStyle = selected ? last.color : "#ffffff";
+        context.fill();
+        context.lineWidth = selected || hovered ? 3 : 2;
+        context.strokeStyle = last.color;
+        context.stroke();
+        context.fillStyle = selected ? "#ffffff" : last.color;
+        context.font = "800 11px system-ui";
+        context.textAlign = "center";
+        context.textBaseline = "middle";
+        context.fillText(endpoint.key === "a" ? "A" : "B", point.x, point.y + 0.5);
+        context.restore();
+      });
     }
 
     if (!preview.ok) return;
@@ -533,10 +570,12 @@
       return;
     }
 
+    hoveredMeasuredStart = findMeasuredStart(screenPoint, view);
     hoveredHandle = findHandle(screenPoint, view);
     hoveredLine = hoveredHandle >= 0 ? hoveredHandle : findLine(screenPoint, view);
     hoveredArea = hoveredHandle >= 0 || hoveredLine >= 0 ? -1 : findAreaIndex(calculator.cuts, physical, calculator.settings.diameter / 2);
-    if (hoveredHandle >= 0) elementCursor("grab");
+    if (hoveredMeasuredStart) elementCursor("pointer");
+    else if (hoveredHandle >= 0) elementCursor("grab");
     else if (hoveredLine >= 0 || hoveredArea >= 0) elementCursor("pointer");
     else elementCursor("crosshair");
     draw();
@@ -551,6 +590,7 @@
     hoveredHandle = -1;
     hoveredLine = -1;
     hoveredArea = -1;
+    hoveredMeasuredStart = undefined;
     previewPoint = undefined;
     elementCursor("crosshair");
     draw();
@@ -570,6 +610,12 @@
     }
 
     const physical = toPhysical(screenPoint, view);
+    const measuredStartChoice = findMeasuredStart(screenPoint, view);
+    if (measuredStartChoice) {
+      onMeasuredStartChange(measuredStartChoice);
+      clearDrawingState();
+      return;
+    }
     const handleIndex = findHandle(screenPoint, view);
     if (handleIndex >= 0) {
       onSelectCut(handleIndex);
