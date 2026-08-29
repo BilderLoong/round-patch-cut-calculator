@@ -376,6 +376,7 @@
     context.textAlign = "center";
     context.textBaseline = "middle";
     context.lineWidth = 4;
+    context.lineJoin = "round";
     context.strokeStyle = "#ffffff";
     context.strokeText(label, middleX, middleY - 9);
     context.fillStyle = "#222222";
