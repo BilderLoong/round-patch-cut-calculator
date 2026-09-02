@@ -4,6 +4,7 @@ import type {
   Cut,
   Direction,
   DirectionSetting,
+  FirstCutPosition,
   GeometryCut,
   MeasurementAdjustmentResult,
   MeasuredInputs,
@@ -290,12 +291,14 @@ export const cutHandle = (
 interface FirstCandidateOptions {
   readonly radius: number;
   readonly fullDose: number;
+  readonly position?: FirstCutPosition;
 }
 
 export const buildFirstMeasuredCutCandidate = ({
   length,
   radius,
   fullDose,
+  position = "near-top",
 }: FirstCandidateOptions & { readonly length: number }): CandidateResult => {
   if (!Number.isFinite(length) || length <= 0) {
     return { ok: false, message: "Enter the first cut length." };
@@ -311,20 +314,22 @@ export const buildFirstMeasuredCutCandidate = ({
 
   const halfLength = length / 2;
   const offset = Math.sqrt(Math.max(0, radius * radius - halfLength * halfLength));
+  const lineY = position === "near-bottom" ? offset : -offset;
   const cut: GeometryCut = {
-    a: { x: -halfLength, y: -offset },
-    b: { x: halfLength, y: -offset },
+    a: { x: -halfLength, y: lineY },
+    b: { x: halfLength, y: lineY },
     removeSign: -1,
   };
+  const fullArea = circleArea(radius);
   const removedArea = polygonArea(
     clipPolygon(circlePolygon(radius), { ...cut, removeSign: 1 }),
   );
-  const dosage = circleArea(radius) > 0 ? (fullDose * removedArea) / circleArea(radius) : 0;
+  const dosage = fullArea > 0 ? (fullDose * removedArea) / fullArea : 0;
 
-  if (removedArea <= circleArea(radius) * MINIMUM_AREA_RATIO) {
+  if (Math.min(removedArea, fullArea - removedArea) <= fullArea * MINIMUM_AREA_RATIO) {
     return {
       ok: false,
-      message: "This first cut is too small to create a measurable area.",
+      message: "This first cut is too close to the patch edge to create two measurable areas.",
     };
   }
 
@@ -337,7 +342,7 @@ export const buildFirstMeasuredCutCandidate = ({
     removedArea,
     dosage,
     message:
-      `First-cut preview: ${length.toFixed(3)} cm horizontal cut, ` +
+      `First-cut preview: ${length.toFixed(3)} cm horizontal cut ${position.replace("-", " ")}, ` +
       `${removedArea.toFixed(3)} cm² top area, ${dosage.toFixed(3)} mg.`,
   };
 };
@@ -346,19 +351,29 @@ export const solveFirstMeasuredCutForArea = (
   options: FirstCandidateOptions,
   targetArea: number,
 ): CandidateResult => {
-  const halfCircleArea = circleArea(options.radius) / 2;
+  const fullArea = circleArea(options.radius);
+  const halfCircleArea = fullArea / 2;
   if (!Number.isFinite(targetArea) || targetArea <= 0) {
     return { ok: false, message: "Enter the dosage for the first area." };
   }
-  if (targetArea > halfCircleArea + 1e-9) {
-    return { ok: false, message: "The first top area cannot be larger than half of the patch." };
+  if (targetArea > fullArea) {
+    return { ok: false, message: "The first top area cannot be larger than the patch." };
+  }
+  if (options.position === "near-bottom" && targetArea < halfCircleArea - 1e-9) {
+    return { ok: false, message: "A near-bottom cut cannot make the top area smaller than half of the patch." };
+  }
+  if (options.position !== "near-bottom" && targetArea > halfCircleArea + 1e-9) {
+    return { ok: false, message: "A near-top cut cannot make the top area larger than half of the patch." };
   }
 
   const bounds = Array.from({ length: 60 }).reduce<{ readonly lower: number; readonly upper: number }>(
     (state) => {
       const length = (state.lower + state.upper) / 2;
       const candidate = buildFirstMeasuredCutCandidate({ ...options, length });
-      return !candidate.ok || candidate.removedArea < targetArea
+      const needsLongerChord = candidate.ok && (options.position === "near-bottom"
+        ? candidate.removedArea > targetArea
+        : candidate.removedArea < targetArea);
+      return !candidate.ok || needsLongerChord
         ? { lower: length, upper: state.upper }
         : { lower: state.lower, upper: length };
     },
@@ -730,15 +745,31 @@ const firstMeasuredCutPreview = (
     if (!Number.isFinite(dose) || dose <= 0) {
       return { ok: false, message: "Enter the dosage for the first top area." };
     }
-    if (!(fullDose > 0) || dose > fullDose / 2) {
+    if (!(fullDose > 0) || dose > fullDose) {
       return {
         ok: false,
-        message: `The first top-area dosage cannot exceed ${(fullDose / 2).toFixed(3)} mg.`,
+        message: `The first top-area dosage cannot exceed ${fullDose.toFixed(3)} mg.`,
+      };
+    }
+    if (inputs.firstPosition === "near-top" && dose > fullDose / 2) {
+      return {
+        ok: false,
+        message: `A near-top cut cannot exceed ${(fullDose / 2).toFixed(3)} mg for the top area.`,
+      };
+    }
+    if (inputs.firstPosition === "near-bottom" && dose < fullDose / 2) {
+      return {
+        ok: false,
+        message: `A near-bottom cut needs at least ${(fullDose / 2).toFixed(3)} mg for the top area.`,
       };
     }
 
     const targetArea = (circleArea(radius) * dose) / fullDose;
-    const solved = solveFirstMeasuredCutForArea({ radius, fullDose }, targetArea);
+    const solved = solveFirstMeasuredCutForArea({
+      radius,
+      fullDose,
+      position: inputs.firstPosition,
+    }, targetArea);
     if (!solved.ok) return solved;
     return { ...solved, dosage: dose };
   }
@@ -747,6 +778,7 @@ const firstMeasuredCutPreview = (
     radius,
     fullDose,
     length: Number(inputs.length),
+    position: inputs.firstPosition,
   });
 };
 

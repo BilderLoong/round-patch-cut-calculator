@@ -1,6 +1,7 @@
 <script lang="ts">
   import type {
     CandidateResult,
+    FirstCutPosition,
     MeasuredInputs,
     StartChoice,
   } from "../calculator/types";
@@ -21,12 +22,17 @@
     return input instanceof HTMLInputElement ? input.value : "";
   };
 
-  const startFromEvent = (event: Event): void => {
+  const cutChoiceFromEvent = (event: Event): void => {
     const select = event.currentTarget;
-    if (!(select instanceof HTMLSelectElement) || select.value === "first") return;
+    if (!(select instanceof HTMLSelectElement)) return;
     if (select.value === "a" || select.value === "b") {
       const start: StartChoice = select.value;
       onInputsChange({ start });
+      return;
+    }
+    if (select.value === "near-top" || select.value === "near-bottom") {
+      const firstPosition: FirstCutPosition = select.value;
+      onInputsChange({ firstPosition });
     }
   };
 
@@ -45,22 +51,25 @@
     <span class="text-xs font-bold text-stone-500">Angle calculated automatically</span>
   </div>
   <p class="mt-1 text-sm leading-6 text-stone-600 [text-wrap:pretty]">
-    For the first cut, enter its length or dosage for the top area. For later cuts, choose End A or End B of the last cut, then enter a length or dosage. The angle is calculated automatically.
+    For the first cut, choose whether the horizontal cut is near the top or near the bottom, then enter its length or top-area dosage. For later cuts, choose End A or End B of the last cut, then enter a length or dosage. The angle is calculated automatically.
   </p>
 
   <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
     <label class="grid gap-2 text-sm font-semibold text-stone-700 sm:col-span-2 lg:col-span-1">
-      <span>Start from last cut</span>
+      <span>{hasCuts ? "Start from last cut" : "First cut position"}</span>
       <select
         class="min-h-10 rounded-xl border border-stone-300 bg-white px-3 py-2 font-[inherit] outline-none transition-[border-color,box-shadow] duration-150 ease-out focus:border-stone-900 focus:ring-4 focus:ring-stone-900/10 disabled:cursor-not-allowed disabled:opacity-55"
-        value={hasCuts ? inputs.start : "first"}
-        onchange={startFromEvent}
-        disabled={!hasCuts}
-        aria-label="Measured cut start"
+        value={hasCuts ? inputs.start : inputs.firstPosition}
+        onchange={cutChoiceFromEvent}
+        aria-label={hasCuts ? "Measured cut start" : "First cut position"}
       >
-        <option value="first">First cut (horizontal)</option>
-        <option value="a">End A</option>
-        <option value="b">End B</option>
+        {#if hasCuts}
+          <option value="a">End A</option>
+          <option value="b">End B</option>
+        {:else}
+          <option value="near-top">Near top — smaller top area</option>
+          <option value="near-bottom">Near bottom — larger top area</option>
+        {/if}
       </select>
     </label>
 

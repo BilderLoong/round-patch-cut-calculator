@@ -22,6 +22,7 @@
   import type {
     CalculatorSettings,
     CalculatorState,
+    FirstCutPosition,
     GeometryCut,
     HistoryState,
     MeasurementAdjustmentResult,
@@ -41,6 +42,7 @@
   let history = $state<HistoryState>(initialHistoryState());
   let measured = $state<MeasuredInputs>({
     start: "a",
+    firstPosition: "near-top",
     length: "",
     dose: "",
     direction: "auto",
@@ -105,6 +107,7 @@
       return;
     }
     const first = calculator.cuts.length === 0;
+    const firstPosition: FirstCutPosition = measured.firstPosition;
     const cutNumber = calculator.cuts.length + 1;
     commitCurrent(addCut(calculator, measuredCut.cut));
     measured = {
@@ -117,7 +120,7 @@
     patchStatus(
       first ? "Cut 1 added from a measured value:" : `Cut ${cutNumber} added from a measured endpoint:`,
       first
-        ? ` the ${measuredCut.length.toFixed(3)} cm horizontal cut removes the top area. The next measured cut can start from End A or End B.`
+        ? ` the ${measuredCut.length.toFixed(3)} cm horizontal cut is ${firstPosition.replace("-", " ")} and removes the top area. The next measured cut can start from End A or End B.`
         : ` the cut length is ${measuredCut.length.toFixed(3)} cm. ${measuredCut.direction} direction and angle were calculated automatically.`,
     );
   };
@@ -151,7 +154,7 @@
   const reset = (): void => {
     requestCanvasInteractionReset();
     commitCurrent(resetCalculator());
-    measured = { start: "a", length: "", dose: "", direction: "auto", source: "length" };
+    measured = { start: "a", firstPosition: "near-top", length: "", dose: "", direction: "auto", source: "length" };
     patchStatus("Ready:", " click empty space twice to draw a cut. Drag a colored handle to move its cut. Hold Space or Shift and drag to pan; use the wheel or trackpad to zoom.");
   };
 

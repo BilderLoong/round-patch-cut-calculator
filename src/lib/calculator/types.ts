@@ -22,6 +22,7 @@ export interface Segment {
 
 export type Direction = "clockwise" | "counterclockwise";
 export type StartChoice = "a" | "b";
+export type FirstCutPosition = "near-top" | "near-bottom";
 export type DirectionSetting = "auto" | Direction;
 export type MeasurementSource = "length" | "dose";
 
@@ -53,6 +54,7 @@ export interface HistoryState {
 
 export interface MeasuredInputs {
   readonly start: StartChoice;
+  readonly firstPosition: FirstCutPosition;
   readonly length: string;
   readonly dose: string;
   readonly direction: DirectionSetting;
@@ -102,4 +104,3 @@ export type MeasurementAdjustmentResult =
 export const some = <T>(value: T): Option<T> => ({ kind: "some", value });
 
 export const none = <T>(): Option<T> => ({ kind: "none" });
-

@@ -16,6 +16,7 @@ const fullDose = 21;
 
 const inputs = (changes: Partial<MeasuredInputs>): MeasuredInputs => ({
   start: "a",
+  firstPosition: "near-top",
   length: "",
   dose: "",
   direction: "auto",
@@ -45,6 +46,29 @@ describe("first measured cut", () => {
     expect(result.dosage).toBeCloseTo(0.551, 2);
   });
 
+  it("places the same chord near the top or near the bottom", () => {
+    const nearTop = buildFirstMeasuredCutCandidate({
+      length: 3,
+      radius,
+      fullDose,
+      position: "near-top",
+    });
+    const nearBottom = buildFirstMeasuredCutCandidate({
+      length: 3,
+      radius,
+      fullDose,
+      position: "near-bottom",
+    });
+
+    expect(nearTop.ok).toBe(true);
+    expect(nearBottom.ok).toBe(true);
+    if (!nearTop.ok || !nearBottom.ok) return;
+    expect(nearBottom.cut.a.y).toBeCloseTo(-nearTop.cut.a.y, 8);
+    expect(nearBottom.length).toBeCloseTo(nearTop.length, 8);
+    expect(nearBottom.dosage + nearTop.dosage).toBeCloseTo(fullDose, 3);
+    expect(nearBottom.removedArea).toBeGreaterThan(circleArea(radius) / 2);
+  });
+
   it("calculates approximately 4.076 cm for a 1.5 mg top area", () => {
     const result = measuredCutPreview([], radius, fullDose, inputs({ source: "dose", dose: "1.5" }));
 
@@ -63,8 +87,32 @@ describe("first measured cut", () => {
     expect(result.dosage).toBeCloseTo(1.53, 2);
   });
 
-  it("limits the first area dosage to half of the labeled dose", () => {
+  it("limits a near-top first area dosage to half of the labeled dose", () => {
     const result = measuredCutPreview([], radius, fullDose, inputs({ source: "dose", dose: "10.501" }));
+
+    expect(result.ok).toBe(false);
+  });
+
+  it("solves a large near-bottom top area from dosage", () => {
+    const result = measuredCutPreview([], radius, fullDose, inputs({
+      firstPosition: "near-bottom",
+      source: "dose",
+      dose: "19.5",
+    }));
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.length).toBeCloseTo(4.076, 2);
+    expect(result.dosage).toBeCloseTo(19.5, 3);
+    expect(result.cut.a.y).toBeGreaterThan(0);
+  });
+
+  it("rejects a near-bottom top-area dosage below half of the labeled dose", () => {
+    const result = measuredCutPreview([], radius, fullDose, inputs({
+      firstPosition: "near-bottom",
+      source: "dose",
+      dose: "10.499",
+    }));
 
     expect(result.ok).toBe(false);
   });
