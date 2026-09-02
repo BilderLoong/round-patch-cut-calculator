@@ -54,11 +54,11 @@
     For the first cut, choose whether the horizontal cut is near the top or near the bottom, then enter its length or top-area dosage. For later cuts, choose End A or End B of the last cut, then enter a length or dosage. The angle is calculated automatically.
   </p>
 
-  <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-    <label class="grid gap-2 text-sm font-semibold text-stone-700 sm:col-span-2 lg:col-span-1">
+  <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-[1.2fr_1fr_1fr]">
+    <label class="grid min-w-0 gap-2 text-sm font-semibold text-stone-700 sm:col-span-2 lg:col-span-1">
       <span>{hasCuts ? "Start from last cut" : "First cut position"}</span>
       <select
-        class="min-h-10 rounded-xl border border-stone-300 bg-white px-3 py-2 font-[inherit] outline-none transition-[border-color,box-shadow] duration-150 ease-out focus:border-stone-900 focus:ring-4 focus:ring-stone-900/10 disabled:cursor-not-allowed disabled:opacity-55"
+        class="min-h-10 w-full min-w-0 max-w-full rounded-xl border border-stone-300 bg-white px-3 py-2 font-[inherit] outline-none transition-[border-color,box-shadow] duration-150 ease-out focus:border-stone-900 focus:ring-4 focus:ring-stone-900/10 disabled:cursor-not-allowed disabled:opacity-55"
         value={hasCuts ? inputs.start : inputs.firstPosition}
         onchange={cutChoiceFromEvent}
         aria-label={hasCuts ? "Measured cut start" : "First cut position"}
@@ -73,10 +73,10 @@
       </select>
     </label>
 
-    <label class="grid gap-2 text-sm font-semibold text-stone-700">
+    <label class="grid min-w-0 gap-2 text-sm font-semibold text-stone-700">
       <span>New cut length (cm)</span>
       <input
-        class="min-h-10 rounded-xl border border-stone-300 bg-white px-3 py-2 font-[inherit] tabular-nums outline-none transition-[border-color,box-shadow] duration-150 ease-out focus:border-stone-900 focus:ring-4 focus:ring-stone-900/10"
+        class="min-h-10 w-full min-w-0 max-w-full rounded-xl border border-stone-300 bg-white px-3 py-2 font-[inherit] tabular-nums outline-none transition-[border-color,box-shadow] duration-150 ease-out focus:border-stone-900 focus:ring-4 focus:ring-stone-900/10"
         type="number"
         min="0.001"
         step="0.001"
@@ -87,10 +87,10 @@
       />
     </label>
 
-    <label class="grid gap-2 text-sm font-semibold text-stone-700">
+    <label class="grid min-w-0 gap-2 text-sm font-semibold text-stone-700">
       <span>New area dosage (mg)</span>
       <input
-        class="min-h-10 rounded-xl border border-stone-300 bg-white px-3 py-2 font-[inherit] tabular-nums outline-none transition-[border-color,box-shadow] duration-150 ease-out focus:border-stone-900 focus:ring-4 focus:ring-stone-900/10"
+        class="min-h-10 w-full min-w-0 max-w-full rounded-xl border border-stone-300 bg-white px-3 py-2 font-[inherit] tabular-nums outline-none transition-[border-color,box-shadow] duration-150 ease-out focus:border-stone-900 focus:ring-4 focus:ring-stone-900/10"
         type="number"
         min="0.001"
         step="0.001"
