@@ -5,6 +5,7 @@
     adjustCutToDose,
     adjustCutToLength,
     measuredCutPreview,
+    roundCutLength,
   } from "./lib/calculator/geometry";
   import {
     addCut,
@@ -128,7 +129,17 @@
   const roundMeasuredLength = (): void => {
     const length = measured.source === "dose" && preview.ok ? preview.length : Number(measured.length);
     if (!Number.isFinite(length) || length <= 0) return;
-    const rounded = (Math.round(length * 10) / 10).toFixed(1);
+    const rounded = roundCutLength(length, calculator.settings.diameter).toFixed(1);
+    const roundedPreview = measuredCutPreview(
+      calculator.cuts,
+      radius,
+      calculator.settings.fullDose,
+      { ...measured, length: rounded, source: "length" },
+    );
+    if (!roundedPreview.ok) {
+      patchStatus("Length not rounded:", ` ${roundedPreview.message}`);
+      return;
+    }
     updateMeasuredInputs({ length: rounded, source: "length" });
   };
 

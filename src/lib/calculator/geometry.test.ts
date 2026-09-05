@@ -7,6 +7,7 @@ import {
   cutDoseForCuts,
   cutSegmentThroughCircle,
   measuredCutPreview,
+  roundCutLength,
   translateCut,
 } from "./geometry";
 import type { Cut, Direction, MeasuredInputs, StartChoice } from "./types";
@@ -79,12 +80,24 @@ describe("first measured cut", () => {
   });
 
   it("rounds 4.076 cm to 4.1 cm and recalculates approximately 1.530 mg", () => {
-    const result = buildFirstMeasuredCutCandidate({ length: 4.1, radius, fullDose });
+    const length = roundCutLength(4.076, radius * 2);
+    const result = buildFirstMeasuredCutCandidate({ length, radius, fullDose });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(Math.round(4.076 * 10) / 10).toBe(4.1);
+    expect(length).toBe(4.1);
     expect(result.dosage).toBeCloseTo(1.53, 2);
+  });
+
+  it("rounds down to a tenth when rounding up would exceed the diameter", () => {
+    const length = roundCutLength(6.18, radius * 2);
+
+    expect(length).toBe(6.1);
+    expect(buildFirstMeasuredCutCandidate({ length, radius, fullDose }).ok).toBe(true);
+  });
+
+  it("keeps a rounded length equal to an exact tenth diameter", () => {
+    expect(roundCutLength(6.18, 6.2)).toBe(6.2);
   });
 
   it("limits a near-top first area dosage to half of the labeled dose", () => {
