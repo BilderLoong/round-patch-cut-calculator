@@ -12,7 +12,7 @@ An interactive calculator for planning straight cuts on a round patch. Each cut 
 - Starts Cut 1 from a measured length or dosage. Cut 1 is a centered horizontal top cap.
 - Continues measured cuts from End A or End B of the previous cut.
 - Chooses a reachable direction automatically for later measured cuts.
-- Rounds a measured cut length to the nearest 0.1 cm.
+- Rounds a measured cut length to 0.1 cm or 0.01 cm without exceeding the diameter. Invalid rounded cuts leave the input unchanged.
 - Lets you draw manual cuts, choose the removed side, select each colored area, edit dosage/area/length, drag handles, and delete cuts.
 - Supports undo, right-click undo, keyboard deletion, snapping, canvas panning, and zooming.
 

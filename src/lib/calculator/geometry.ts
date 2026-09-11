@@ -26,8 +26,15 @@ const closeEnough = (a: number, b: number, tolerance: number): boolean =>
 
 export const circleArea = (radius: number): number => Math.PI * radius * radius;
 
-export const roundCutLength = (length: number, diameter: number): number =>
-  Math.min(Math.round(length * 10), Math.floor(diameter * 10)) / 10;
+export const roundCutLength = (
+  length: number,
+  diameter: number,
+  decimalPlaces: 1 | 2 = 1,
+): number => {
+  const scale = 10 ** decimalPlaces;
+  const rounded = Math.round(length * scale) / scale;
+  return rounded <= diameter ? rounded : Math.floor(diameter * scale) / scale;
+};
 
 export const circlePolygon = (
   radius: number,

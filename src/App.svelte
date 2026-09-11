@@ -126,10 +126,10 @@
     );
   };
 
-  const roundMeasuredLength = (): void => {
+  const roundMeasuredLength = (decimalPlaces: 1 | 2): void => {
     const length = measured.source === "dose" && preview.ok ? preview.length : Number(measured.length);
     if (!Number.isFinite(length) || length <= 0) return;
-    const rounded = roundCutLength(length, calculator.settings.diameter).toFixed(1);
+    const rounded = roundCutLength(length, calculator.settings.diameter, decimalPlaces).toFixed(decimalPlaces);
     const roundedPreview = measuredCutPreview(
       calculator.cuts,
       radius,

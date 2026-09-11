@@ -100,6 +100,14 @@ describe("first measured cut", () => {
     expect(roundCutLength(6.18, 6.2)).toBe(6.2);
   });
 
+  it("rounds to hundredths without exceeding the diameter", () => {
+    expect(roundCutLength(4.076, radius * 2, 2)).toBe(4.08);
+    expect(roundCutLength(4.074, radius * 2, 2)).toBe(4.07);
+    expect(roundCutLength(6.179, 6.179, 2)).toBe(6.17);
+    expect(roundCutLength(6.179, 6.18, 2)).toBe(6.18);
+    expect(roundCutLength(4.1, 4.1, 2)).toBe(4.1);
+  });
+
   it("limits a near-top first area dosage to half of the labeled dose", () => {
     const result = measuredCutPreview([], radius, fullDose, inputs({ source: "dose", dose: "10.501" }));
 

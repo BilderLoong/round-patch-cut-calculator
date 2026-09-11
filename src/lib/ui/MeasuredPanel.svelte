@@ -12,7 +12,7 @@
     readonly preview: CandidateResult;
     readonly onInputsChange: (changes: Partial<MeasuredInputs>) => void;
     readonly onAdd: () => void;
-    readonly onRound: () => void;
+    readonly onRound: (decimalPlaces: 1 | 2) => void;
   }
 
   let { hasCuts, inputs, preview, onInputsChange, onAdd, onRound }: Props = $props();
@@ -114,10 +114,18 @@
     <button
       class="min-h-11 rounded-xl bg-white px-4 py-2 text-sm font-bold text-stone-900 shadow-[0_1px_3px_rgb(0_0_0_/0.08),0_4px_12px_rgb(0_0_0_/0.05)] ring-1 ring-stone-300 transition-[background-color,transform] duration-150 ease-out hover:bg-stone-100 active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-55 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900"
       type="button"
-      onclick={onRound}
+      onclick={() => onRound(1)}
       disabled={!preview.ok}
     >
-      Round length to 0.1 cm
+      Round to 0.1 cm
+    </button>
+    <button
+      class="min-h-11 rounded-xl bg-white px-4 py-2 text-sm font-bold text-stone-900 shadow-[0_1px_3px_rgb(0_0_0_/0.08),0_4px_12px_rgb(0_0_0_/0.05)] ring-1 ring-stone-300 transition-[background-color,transform] duration-150 ease-out hover:bg-stone-100 active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-55 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900"
+      type="button"
+      onclick={() => onRound(2)}
+      disabled={!preview.ok}
+    >
+      Round to 0.01 cm
     </button>
     <span class="text-sm leading-5 text-stone-600" class:font-semibold={preview.ok}>
       {preview.message}
