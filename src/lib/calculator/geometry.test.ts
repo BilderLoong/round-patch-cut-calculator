@@ -22,6 +22,7 @@ const inputs = (changes: Partial<MeasuredInputs>): MeasuredInputs => ({
   dose: "",
   direction: "auto",
   source: "length",
+  lengthMeasurement: "cut",
   ...changes,
 });
 
@@ -184,6 +185,79 @@ describe("first measured cut", () => {
 
     const next = cutAreaForCuts([moved.value], 0, radius);
     expect(next).not.toBeCloseTo(original, 6);
+  });
+});
+
+describe("measurement from the other endpoint", () => {
+  const startChoices: readonly StartChoice[] = ["a", "b"];
+  it.each([...startChoices])("locates the same cut from the other endpoint when starting at %s", (start) => {
+    const first = buildFirstMeasuredCutCandidate({ length: 6.1, radius, fullDose });
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+    const cuts = [{ ...first.cut, color: "#e74c3c" }];
+    const original = measuredCutPreview(cuts, radius, fullDose, inputs({ start, length: "6.15" }));
+    expect(original.ok).toBe(true);
+    if (!original.ok) return;
+
+    const gap = measuredCutPreview(cuts, radius, fullDose, inputs({
+      start, length: "0.384522", lengthMeasurement: "other-endpoint",
+    }));
+    expect(gap.ok).toBe(true);
+    if (!gap.ok) return;
+    expect(gap.length).toBeCloseTo(6.15, 4);
+    expect(gap.cut.a.x).toBeCloseTo(original.cut.a.x, 6);
+    expect(gap.cut.b.x).toBeCloseTo(original.cut.b.x, 4);
+    expect(gap.cut.b.y).toBeCloseTo(original.cut.b.y, 4);
+    expect(gap.removedArea).toBeCloseTo(original.removedArea, 4);
+    expect(gap.measurement.length).toBeCloseTo(0.384522, 6);
+  });
+
+  it("shows the gap for a dosage preview and recalculates after rounding the gap", () => {
+    const first = buildFirstMeasuredCutCandidate({ length: 6.1, radius, fullDose });
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+    const cuts = [{ ...first.cut, color: "#e74c3c" }];
+    const original = measuredCutPreview(cuts, radius, fullDose, inputs({ length: "6.15" }));
+    expect(original.ok).toBe(true);
+    if (!original.ok) return;
+    const fromDose = measuredCutPreview(cuts, radius, fullDose, inputs({
+      source: "dose", dose: String(original.dosage), lengthMeasurement: "other-endpoint",
+    }));
+    expect(fromDose.ok).toBe(true);
+    if (!fromDose.ok) return;
+    expect(fromDose.measurement.length).toBeCloseTo(0.384522, 4);
+    const rounded = measuredCutPreview(cuts, radius, fullDose, inputs({
+      length: String(roundCutLength(fromDose.measurement.length, radius * 2)),
+      lengthMeasurement: "other-endpoint",
+    }));
+    expect(rounded.ok).toBe(true);
+    if (!rounded.ok) return;
+    expect(rounded.measurement.length).toBe(0.4);
+    expect(rounded.length).toBeGreaterThan(6.15);
+    expect(rounded.removedArea).toBeCloseTo(1.216, 3);
+  });
+
+  it("requires a previous cut and rejects gaps outside the circle", () => {
+    expect(measuredCutPreview([], radius, fullDose, inputs({
+      length: "0.4", lengthMeasurement: "other-endpoint",
+    })).ok).toBe(false);
+    const first = buildFirstMeasuredCutCandidate({ length: 6.1, radius, fullDose });
+    if (!first.ok) throw new Error(first.message);
+    for (const length of ["", "0", "-1", "6.2"]) {
+      expect(measuredCutPreview([{ ...first.cut, color: "#e74c3c" }], radius, fullDose, inputs({
+        length, lengthMeasurement: "other-endpoint",
+      })).ok).toBe(false);
+    }
+  });
+
+  it("rejects a measurement from an endpoint removed by an earlier cut", () => {
+    const earlier: Cut = { a: { x: 0, y: -radius }, b: { x: 0, y: radius }, removeSign: -1, color: "#e74c3c" };
+    const previous: Cut = { a: { x: -radius, y: 0 }, b: { x: radius, y: 0 }, removeSign: -1, color: "#3498db" };
+    const result = measuredCutPreview([earlier, previous], radius, fullDose, inputs({
+      start: "a", length: "0.4", lengthMeasurement: "other-endpoint",
+    }));
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.message).toContain("other endpoint is no longer");
   });
 });
 

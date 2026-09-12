@@ -4,12 +4,14 @@
     adjustCutToArea,
     adjustCutToDose,
     adjustCutToLength,
+    directionFromCirclePoint,
     measuredCutPreview,
     roundCutLength,
   } from "./lib/calculator/geometry";
   import {
     addCut,
     appendHistorySnapshot,
+    changeLengthMeasurement,
     commitHistory,
     deleteCut,
     initialHistoryState,
@@ -48,6 +50,7 @@
     dose: "",
     direction: "auto",
     source: "length",
+    lengthMeasurement: "cut",
   });
   let status = $state("Ready:");
   let instruction = $state(" click empty space twice to draw a cut. Drag a colored handle to move its cut. Hold Space or Shift and drag to pan; use the wheel or trackpad to zoom.");
@@ -59,6 +62,12 @@
   let calculator = $derived(history.current);
   let radius = $derived(calculator.settings.diameter / 2);
   let preview = $derived(measuredCutPreview(calculator.cuts, radius, calculator.settings.fullDose, measured));
+
+  $effect(() => {
+    if (!calculator.cuts.length && measured.lengthMeasurement === "other-endpoint") {
+      measured = { ...measured, lengthMeasurement: "cut", length: "", dose: "", source: "length", direction: "auto" };
+    }
+  });
 
   const patchStatus = (nextStatus: string, nextInstruction: string): void => {
     status = nextStatus;
@@ -78,17 +87,21 @@
   };
 
   const updateMeasuredInputs = (changes: Partial<MeasuredInputs>): void => {
+    if (changes.lengthMeasurement !== undefined && changes.lengthMeasurement !== measured.lengthMeasurement) {
+      measured = changeLengthMeasurement(calculator, measured, preview, changes.lengthMeasurement);
+      return;
+    }
     const next: MeasuredInputs = { ...measured, ...changes };
     const source: MeasurementSource = changes.source ?? next.source;
     if (source === "length" && changes.length !== undefined) {
-      measured = { ...next, source, dose: "" };
+      measured = { ...next, source, dose: "", direction: changes.direction ?? "auto" };
       return;
     }
     if (source === "dose" && changes.dose !== undefined) {
-      measured = { ...next, source, length: "" };
+      measured = { ...next, source, length: "", direction: "auto" };
       return;
     }
-    measured = { ...next, source };
+    measured = { ...next, source, direction: changes.start === undefined ? next.direction : "auto" };
   };
 
   const setCanvasInteractionPending = (pending: boolean): void => {
@@ -117,6 +130,7 @@
       length: "",
       dose: "",
       source: "length",
+      direction: "auto",
     };
     patchStatus(
       first ? "Cut 1 added from a measured value:" : `Cut ${cutNumber} added from a measured endpoint:`,
@@ -127,20 +141,22 @@
   };
 
   const roundMeasuredLength = (decimalPlaces: 1 | 2): void => {
-    const length = measured.source === "dose" && preview.ok ? preview.length : Number(measured.length);
+    if (!preview.ok) return;
+    const length = measured.source === "dose" ? preview.measurement.length : Number(measured.length);
     if (!Number.isFinite(length) || length <= 0) return;
     const rounded = roundCutLength(length, calculator.settings.diameter, decimalPlaces).toFixed(decimalPlaces);
+    const direction = directionFromCirclePoint(preview.measurement.from, preview.cut.b);
     const roundedPreview = measuredCutPreview(
       calculator.cuts,
       radius,
       calculator.settings.fullDose,
-      { ...measured, length: rounded, source: "length" },
+      { ...measured, length: rounded, source: "length", direction },
     );
     if (!roundedPreview.ok) {
       patchStatus("Length not rounded:", ` ${roundedPreview.message}`);
       return;
     }
-    updateMeasuredInputs({ length: rounded, source: "length" });
+    updateMeasuredInputs({ length: rounded, source: "length", direction });
   };
 
   const fitPatch = (): void => {
@@ -165,7 +181,7 @@
   const reset = (): void => {
     requestCanvasInteractionReset();
     commitCurrent(resetCalculator());
-    measured = { start: "a", firstPosition: "near-top", length: "", dose: "", direction: "auto", source: "length" };
+    measured = { start: "a", firstPosition: "near-top", length: "", dose: "", direction: "auto", source: "length", lengthMeasurement: "cut" };
     patchStatus("Ready:", " click empty space twice to draw a cut. Drag a colored handle to move its cut. Hold Space or Shift and drag to pan; use the wheel or trackpad to zoom.");
   };
 
@@ -295,6 +311,7 @@
             calculator={calculator}
             preview={preview}
             measuredStart={measured.start}
+            lengthMeasurement={measured.lengthMeasurement}
             spaceHeld={spaceHeld}
             interactionResetToken={interactionResetToken}
             onAddCut={addManualCut}

@@ -1,11 +1,39 @@
 import type {
   CalculatorSettings,
   CalculatorState,
+  CandidateResult,
   Cut,
   GeometryCut,
   HistoryState,
+  LengthMeasurement,
+  MeasuredInputs,
   ViewState,
 } from "./types";
+import { cutSegmentThroughCircle, directionFromCirclePoint } from "./geometry";
+
+export const changeLengthMeasurement = (
+  state: CalculatorState,
+  inputs: MeasuredInputs,
+  preview: CandidateResult,
+  lengthMeasurement: LengthMeasurement,
+): MeasuredInputs => {
+  const next: MeasuredInputs = { ...inputs, lengthMeasurement, length: "", direction: "auto" };
+  if (!preview.ok || inputs.source === "dose") return next;
+  const previous = state.cuts.at(-1);
+  const segment = previous
+    ? cutSegmentThroughCircle(previous, state.settings.diameter / 2)
+    : undefined;
+  if (lengthMeasurement === "other-endpoint" && segment?.kind !== "some") return next;
+  const from = lengthMeasurement === "other-endpoint" && segment?.kind === "some"
+    ? (inputs.start === "a" ? segment.value.b : segment.value.a)
+    : preview.cut.a;
+  return {
+    ...next,
+    dose: "",
+    length: String(Math.hypot(preview.cut.b.x - from.x, preview.cut.b.y - from.y)),
+    direction: directionFromCirclePoint(from, preview.cut.b),
+  };
+};
 
 export const COLORS: readonly string[] = [
   "#e74c3c",

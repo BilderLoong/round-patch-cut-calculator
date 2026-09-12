@@ -6,6 +6,7 @@ import type {
   DirectionSetting,
   FirstCutPosition,
   GeometryCut,
+  LengthMeasurement,
   MeasurementAdjustmentResult,
   MeasuredInputs,
   Option,
@@ -348,6 +349,7 @@ export const buildFirstMeasuredCutCandidate = ({
     cut,
     direction: "horizontal",
     length,
+    measurement: { from: cut.a, length },
     lineAngle: 0,
     removedArea,
     dosage,
@@ -418,6 +420,9 @@ const endpointAtCentralAngle = (
   return { x: Math.cos(endAngle) * radius, y: Math.sin(endAngle) * radius };
 };
 
+export const directionFromCirclePoint = (from: Point, to: Point): Direction =>
+  from.x * to.y - from.y * to.x >= 0 ? "clockwise" : "counterclockwise";
+
 const lengthAtCentralAngle = (radius: number, centralAngle: number): number =>
   radius * 2 * Math.sin(centralAngle / 2);
 
@@ -427,10 +432,14 @@ const buildMeasuredCutCandidateGeometry = ({
   currentPiece,
   startChoice,
   length,
+  lengthMeasurement = "cut",
   direction,
   radius,
   fullDose,
-}: ConnectedCandidateOptions & { readonly length: number }): CandidateResult => {
+}: ConnectedCandidateOptions & {
+  readonly length: number;
+  readonly lengthMeasurement?: LengthMeasurement;
+}): CandidateResult => {
   if (!Number.isFinite(length) || length <= 0) {
     return { ok: false, message: "Enter the new cut length." };
   }
@@ -445,8 +454,12 @@ const buildMeasuredCutCandidateGeometry = ({
 
   const start = startChoice === "a" ? previousSegment.a : previousSegment.b;
   const otherEnd = startChoice === "a" ? previousSegment.b : previousSegment.a;
+  const from = lengthMeasurement === "other-endpoint" ? otherEnd : start;
+  if (!previousCuts.every((cut) => insideHalfPlane(from, cut))) {
+    return { ok: false, message: "The measurement endpoint is no longer on the remaining piece. Choose another measurement or start endpoint." };
+  }
   const centralAngle = 2 * Math.asin(Math.min(1, length / diameter));
-  const end = endpointAtCentralAngle(start, radius, direction, centralAngle);
+  const end = endpointAtCentralAngle(from, radius, direction, centralAngle);
   const side = cross(start, end, otherEnd);
 
   if (Math.abs(side) < 1e-9) {
@@ -476,23 +489,30 @@ const buildMeasuredCutCandidateGeometry = ({
   );
 
   const lineAngle = (Math.atan2(end.y - start.y, end.x - start.x) * 180) / Math.PI;
+  const cutLength = lengthMeasurement === "other-endpoint"
+    ? Math.hypot(end.x - start.x, end.y - start.y)
+    : length;
   const dosage = circleArea(radius) > 0 ? (fullDose * removedArea) / circleArea(radius) : 0;
   return {
     ok: true,
     cut,
     direction,
-    length,
+    length: cutLength,
+    measurement: { from, length },
     lineAngle,
     removedArea,
     dosage,
     message:
-      `${length.toFixed(3)} cm cut, ${removedArea.toFixed(3)} cm² area. ` +
+      `${cutLength.toFixed(3)} cm cut, ${removedArea.toFixed(3)} cm² area. ` +
       `Calculated line angle ${lineAngle.toFixed(1)}°.`,
   };
 };
 
 export const buildMeasuredCutCandidate = (
-  options: ConnectedCandidateOptions & { readonly length: number },
+  options: ConnectedCandidateOptions & {
+    readonly length: number;
+    readonly lengthMeasurement?: LengthMeasurement;
+  },
 ): CandidateResult => {
   const candidate = buildMeasuredCutCandidateGeometry(options);
   if (!candidate.ok) return candidate;
@@ -798,7 +818,12 @@ export const measuredCutPreview = (
   fullDose: number,
   inputs: MeasuredInputs,
 ): CandidateResult => {
-  if (!cuts.length) return firstMeasuredCutPreview(radius, fullDose, inputs);
+  if (!cuts.length) {
+    if (inputs.lengthMeasurement === "other-endpoint") {
+      return { ok: false, message: "Add a first cut before measuring from the other endpoint." };
+    }
+    return firstMeasuredCutPreview(radius, fullDose, inputs);
+  }
 
   const previousCut = cuts.at(-1);
   if (!previousCut) return { ok: false, message: "The previous cut is not available." };
@@ -816,10 +841,19 @@ export const measuredCutPreview = (
     radius,
     fullDose,
   };
+  const otherEnd = inputs.start === "a" ? previousSegment.value.b : previousSegment.value.a;
+  if (inputs.lengthMeasurement === "other-endpoint" && !cuts.every((cut) => insideHalfPlane(otherEnd, cut))) {
+    return { ok: false, message: "The other endpoint is no longer on the remaining piece. Measure the cut length instead." };
+  }
   if (inputs.source === "length") {
     const length = Number(inputs.length);
     if (!Number.isFinite(length) || length <= 0) {
-      return { ok: false, message: "Enter the new cut length." };
+      return {
+        ok: false,
+        message: inputs.lengthMeasurement === "other-endpoint"
+          ? "Enter the gap from the other endpoint."
+          : "Enter the new cut length.",
+      };
     }
   }
   const directions: readonly Direction[] =
@@ -860,6 +894,9 @@ export const measuredCutPreview = (
     const autoMessage = inputs.direction === "auto" ? ` Auto chose ${chosen.direction}.` : "";
     return {
       ...chosen,
+      measurement: inputs.lengthMeasurement === "other-endpoint"
+        ? { from: otherEnd, length: Math.hypot(chosen.cut.b.x - otherEnd.x, chosen.cut.b.y - otherEnd.y) }
+        : chosen.measurement,
       dosage: dose,
       message:
         `Preview: ${chosen.length.toFixed(3)} cm cut, ${chosen.removedArea.toFixed(3)} cm² area, ` +
@@ -868,7 +905,7 @@ export const measuredCutPreview = (
   }
 
   const candidates = directions.map((direction) =>
-    buildMeasuredCutCandidate({ ...options, direction, length: Number(inputs.length) }),
+    buildMeasuredCutCandidate({ ...options, direction, length: Number(inputs.length), lengthMeasurement: inputs.lengthMeasurement }),
   );
   const validCandidates = candidates.filter(isCandidateSuccess);
   const firstCandidate = validCandidates.at(0);

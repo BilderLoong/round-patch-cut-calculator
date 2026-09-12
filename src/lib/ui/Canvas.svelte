@@ -18,6 +18,7 @@
     CalculatorState,
     CandidateResult,
     GeometryCut,
+    LengthMeasurement,
     Point,
     StartChoice,
     ViewState,
@@ -37,6 +38,7 @@
     readonly calculator: CalculatorState;
     readonly preview: CandidateResult;
     readonly measuredStart: StartChoice;
+    readonly lengthMeasurement: LengthMeasurement;
     readonly spaceHeld: boolean;
     readonly interactionResetToken: number;
     readonly onAddCut: (cut: GeometryCut) => void;
@@ -55,6 +57,7 @@
     calculator,
     preview,
     measuredStart,
+    lengthMeasurement,
     spaceHeld,
     interactionResetToken,
     onAddCut,
@@ -510,6 +513,34 @@
     context.fillStyle = color;
     context.fillText(`${preview.length.toFixed(3)} cm`, (start.x + end.x) / 2, (start.y + end.y) / 2 - 7);
     context.restore();
+
+    if (last && lengthMeasurement === "other-endpoint") {
+      const from = toCanvas(preview.measurement.from, view);
+      const gapLabel = measuredStart === "a" ? "B–C" : "A–C";
+      context.save();
+      context.beginPath();
+      context.moveTo(from.x, from.y);
+      context.lineTo(end.x, end.y);
+      context.lineWidth = 3;
+      context.strokeStyle = "#b45309";
+      context.stroke();
+      context.font = "800 12px system-ui";
+      context.textAlign = "center";
+      context.textBaseline = "middle";
+      context.lineWidth = 4;
+      context.strokeStyle = "#ffffff";
+      const label = `Gap ${gapLabel}: ${preview.measurement.length.toFixed(3)} cm`;
+      const halfWidth = context.measureText(label).width / 2;
+      const labelX = Math.max(halfWidth + 8, Math.min(view.width - halfWidth - 8, (from.x + end.x) / 2));
+      const labelY = Math.max(14, Math.min(view.height - 14, (from.y + end.y) / 2 + 36));
+      context.strokeText(label, labelX, labelY);
+      context.fillStyle = "#92400e";
+      context.fillText(label, labelX, labelY);
+      const cLabelX = Math.max(8, Math.min(view.width - 8, end.x + (end.x >= view.cx ? 20 : -20)));
+      context.strokeText("C", cLabelX, end.y);
+      context.fillText("C", cLabelX, end.y);
+      context.restore();
+    }
   };
 
   const draw = (): void => {

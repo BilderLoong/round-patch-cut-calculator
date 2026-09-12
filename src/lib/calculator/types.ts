@@ -25,6 +25,7 @@ export type StartChoice = "a" | "b";
 export type FirstCutPosition = "near-top" | "near-bottom";
 export type DirectionSetting = "auto" | Direction;
 export type MeasurementSource = "length" | "dose";
+export type LengthMeasurement = "cut" | "other-endpoint";
 
 export interface CalculatorSettings {
   readonly diameter: number;
@@ -59,6 +60,7 @@ export interface MeasuredInputs {
   readonly dose: string;
   readonly direction: DirectionSetting;
   readonly source: MeasurementSource;
+  readonly lengthMeasurement: LengthMeasurement;
 }
 
 export interface CandidateSuccess {
@@ -66,6 +68,10 @@ export interface CandidateSuccess {
   readonly cut: GeometryCut;
   readonly direction: Direction | "horizontal";
   readonly length: number;
+  readonly measurement: {
+    readonly from: Point;
+    readonly length: number;
+  };
   readonly lineAngle: number;
   readonly removedArea: number;
   readonly dosage: number;

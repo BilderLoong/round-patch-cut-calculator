@@ -11,6 +11,7 @@ An interactive calculator for planning straight cuts on a round patch. Each cut 
 - Uses a default patch area of 30 cm² and a labeled full-patch dosage of 21 mg.
 - Starts Cut 1 from a measured length or dosage. Cut 1 is a centered horizontal top cap.
 - Continues measured cuts from End A or End B of the previous cut.
+- Offers a gap measurement from the other endpoint to locate the next cut. For a cut from A to C, measure the straight gap B–C; the canvas marks this gap in orange. The rounding buttons round the selected measurement.
 - Chooses a reachable direction automatically for later measured cuts.
 - Rounds a measured cut length to 0.1 cm or 0.01 cm without exceeding the diameter. Invalid rounded cuts leave the input unchanged.
 - Lets you draw manual cuts, choose the removed side, select each colored area, edit dosage/area/length, drag handles, and delete cuts.
